@@ -8,11 +8,12 @@ const field =
 
 interface Props {
   initial?: Partial<ResumeInput>;
-  onSubmit: (input: ResumeInput) => void;
+  onSubmit: (input: ResumeInput, file?: File) => void;
 }
 
 export function ResumeUpload({ initial, onSubmit }: Props) {
   const [fileName, setFileName] = useState<string | undefined>(initial?.fileName);
+  const [file, setFile] = useState<File>();
   const [manual, setManual] = useState(!!initial?.recentRole);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
@@ -24,16 +25,18 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
   });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const set = <K extends keyof ResumeInput>(k: K, v: ResumeInput[K]) => setData((d) => ({ ...d, [k]: v }));
+  const set = <K extends keyof ResumeInput>(k: K, v: ResumeInput[K]) =>
+    setData((d) => ({ ...d, [k]: v }));
 
-  const accept = (file?: File) => {
-    if (!file) return;
-    if (!/\.(pdf|docx?|txt)$/i.test(file.name)) {
+  const accept = (candidate?: File) => {
+    if (!candidate) return;
+    if (!/\.(pdf|docx?|txt)$/i.test(candidate.name)) {
       setError("Please upload a PDF, DOC, DOCX or TXT file.");
       return;
     }
     setError("");
-    setFileName(file.name);
+    setFileName(candidate.name);
+    setFile(candidate);
   };
 
   const submit = () => {
@@ -41,11 +44,15 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
       setError("Upload a resume or enter your experience manually to continue.");
       return;
     }
-    onSubmit({ ...data, fileName });
+    onSubmit({ ...data, fileName }, file);
   };
 
   return (
-    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="px-5 py-10">
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="px-5 py-10"
+    >
       <div className="mx-auto max-w-2xl">
         <h2 className="text-2xl font-extrabold sm:text-3xl">Upload Your Resume</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -78,7 +85,10 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
                 <p className="text-xs text-muted-foreground">Ready to analyze</p>
               </div>
               <button
-                onClick={() => setFileName(undefined)}
+                onClick={() => {
+                  setFileName(undefined);
+                  setFile(undefined);
+                }}
                 className="ml-2 rounded-full p-2 text-muted-foreground transition hover:bg-secondary"
                 aria-label="Remove file"
               >
@@ -117,22 +127,52 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
         </button>
 
         {manual && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-4 space-y-4 overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="mt-4 space-y-4 overflow-hidden"
+          >
             <div>
-              <label className="mb-1.5 block text-sm font-semibold">Most recent role / desired role</label>
-              <input className={field} value={data.recentRole} onChange={(e) => set("recentRole", e.target.value)} maxLength={100} placeholder="Customer Service Representative" />
+              <label className="mb-1.5 block text-sm font-semibold">
+                Most recent role / desired role
+              </label>
+              <input
+                className={field}
+                value={data.recentRole}
+                onChange={(e) => set("recentRole", e.target.value)}
+                maxLength={100}
+                placeholder="Customer Service Representative"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Work experience summary</label>
-              <textarea className={`${field} min-h-24`} value={data.experienceSummary} onChange={(e) => set("experienceSummary", e.target.value)} maxLength={800} placeholder="What did you do day to day?" />
+              <textarea
+                className={`${field} min-h-24`}
+                value={data.experienceSummary}
+                onChange={(e) => set("experienceSummary", e.target.value)}
+                maxLength={800}
+                placeholder="What did you do day to day?"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Key skills</label>
-              <input className={field} value={data.keySkills} onChange={(e) => set("keySkills", e.target.value)} maxLength={300} placeholder="Communication, Excel, CRM, Reporting" />
+              <input
+                className={field}
+                value={data.keySkills}
+                onChange={(e) => set("keySkills", e.target.value)}
+                maxLength={300}
+                placeholder="Communication, Excel, CRM, Reporting"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Industries of interest</label>
-              <input className={field} value={data.industries} onChange={(e) => set("industries", e.target.value)} maxLength={200} placeholder="Banking, Technology, Retail" />
+              <input
+                className={field}
+                value={data.industries}
+                onChange={(e) => set("industries", e.target.value)}
+                maxLength={200}
+                placeholder="Banking, Technology, Retail"
+              />
             </div>
           </motion.div>
         )}

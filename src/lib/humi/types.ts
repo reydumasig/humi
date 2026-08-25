@@ -113,7 +113,8 @@ export interface Lead {
   email: string;
   phone: string;
   careerStage: string;
-  resumeFileName: string;
+  resumeFileName: string | null;
+  resumeUrl: string | null;
   recommendedRole: string;
   careerInterest: string;
   aiReadiness: number;

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { HumiLogo } from "@/components/humi/HumiLogo";
 import { OrbitBackdrop } from "@/components/humi/OrbitGraphic";
@@ -11,20 +12,9 @@ import { ResumeParsingLoader } from "@/components/humi/ResumeParsingLoader";
 import { ResumeSummary } from "@/components/humi/ResumeSummary";
 import { CareerInterestForm } from "@/components/humi/CareerInterestForm";
 import { CareerEvolutionReport } from "@/components/humi/CareerEvolutionReport";
-import {
-  SAMPLE_PROFILES,
-  buildReport,
-  getRecommendations,
-  parseResume,
-} from "@/lib/humi/engine";
-import { saveLead } from "@/lib/humi/leads";
-import type {
-  InterestData,
-  ParsedResume,
-  Report,
-  ResumeInput,
-  SignupData,
-} from "@/lib/humi/types";
+import { SAMPLE_PROFILES, buildReport, getRecommendations, parseResume } from "@/lib/humi/engine";
+import { submitLead } from "@/lib/api/leads.functions";
+import type { InterestData, ParsedResume, Report, ResumeInput, SignupData } from "@/lib/humi/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,13 +48,14 @@ function HumiApp() {
   const [parsed, setParsed] = useState<ParsedResume | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [interest, setInterest] = useState<InterestData | null>(null);
-
+  const [resumeFile, setResumeFile] = useState<File | undefined>();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
-  const runParse = (input: ResumeInput, who: SignupData) => {
+  const runParse = (input: ResumeInput, who: SignupData, file?: File) => {
+    setResumeFile(file);
     setStep("parsing");
     setTimeout(() => {
       setParsed(parseResume(input, who));
@@ -78,16 +69,20 @@ function HumiApp() {
     setInterest(interestData);
     setReport(built);
 
-    saveLead({
-      firstName: signup.firstName,
-      lastName: signup.lastName,
-      email: signup.email,
-      phone: signup.phone,
-      careerStage: signup.careerStage || "Not specified",
-      resumeFileName: parsed.fileName ?? "Manual entry",
-      recommendedRole: built.futureRole,
-      careerInterest: `${interestData.chosenRole} · ${interestData.industry}`,
-      aiReadiness: built.aiReadiness,
+    const form = new FormData();
+    form.set("firstName", signup.firstName);
+    form.set("lastName", signup.lastName);
+    form.set("email", signup.email);
+    form.set("phone", signup.phone);
+    form.set("careerStage", signup.careerStage || "Not specified");
+    form.set("recommendedRole", built.futureRole);
+    form.set("careerInterest", `${interestData.chosenRole} · ${interestData.industry}`);
+    form.set("aiReadiness", String(built.aiReadiness));
+    if (resumeFile) form.set("resume", resumeFile);
+
+    submitLead({ data: form }).catch((err) => {
+      console.error("Failed to save candidate lead", err);
+      toast.error("We couldn't save your submission, but your report is ready below.");
     });
 
     setStep("report");
@@ -96,7 +91,13 @@ function HumiApp() {
   const loadSample = (index: number) => {
     const s = SAMPLE_PROFILES[index]!;
     const who: SignupData = {
-      firstName: "", lastName: "", email: "", phone: "", location: "", careerStage: "", consent: true,
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      location: "",
+      careerStage: "",
+      consent: true,
       ...s.signup,
     } as SignupData;
     setSignup(who);
@@ -127,11 +128,16 @@ function HumiApp() {
               >
                 <option value="">Demo profile…</option>
                 {SAMPLE_PROFILES.map((s, i) => (
-                  <option key={s.label} value={i}>{s.label}</option>
+                  <option key={s.label} value={i}>
+                    {s.label}
+                  </option>
                 ))}
               </select>
             )}
-            <Link to="/admin" className="text-xs font-semibold text-muted-foreground hover:text-primary">
+            <Link
+              to="/admin"
+              className="text-xs font-semibold text-muted-foreground hover:text-primary"
+            >
               Leads
             </Link>
           </div>
@@ -151,7 +157,11 @@ function HumiApp() {
           />
         )}
         {step === "upload" && signup && (
-          <ResumeUpload key="upload" initial={resumePrefill} onSubmit={(input) => runParse(input, signup)} />
+          <ResumeUpload
+            key="upload"
+            initial={resumePrefill}
+            onSubmit={(input, file) => runParse(input, signup, file)}
+          />
         )}
         {step === "parsing" && <ResumeParsingLoader key="parsing" />}
         {step === "summary" && parsed && signup && (
@@ -183,6 +193,7 @@ function HumiApp() {
 
               setSignupPrefill(undefined);
               setResumePrefill(undefined);
+              setResumeFile(undefined);
             }}
           />
         )}

@@ -1,7 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { CandidateLeadsDashboard } from "@/components/humi/CandidateLeadsDashboard";
+import { getAdminMe } from "@/lib/api/admin-auth.functions";
 
 export const Route = createFileRoute("/admin")({
+  beforeLoad: async () => {
+    const me = await getAdminMe();
+    if (!me) throw redirect({ to: "/admin-login" });
+    return { adminEmail: me.email };
+  },
   head: () => ({
     meta: [
       { title: "Candidate Leads — Humi.ai" },
@@ -11,5 +17,10 @@ export const Route = createFileRoute("/admin")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: () => <CandidateLeadsDashboard />,
+  component: AdminRoute,
 });
+
+function AdminRoute() {
+  const { adminEmail } = Route.useRouteContext();
+  return <CandidateLeadsDashboard adminEmail={adminEmail} />;
+}

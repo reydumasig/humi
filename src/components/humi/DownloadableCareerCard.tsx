@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { Download, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { sendCareerProfileEmail } from "@/lib/api/email.functions";
 import type { Report, SignupData } from "@/lib/humi/types";
 
 interface Props {
@@ -12,8 +13,30 @@ interface Props {
   nextAction?: string;
 }
 
-export function DownloadableCareerCard({ report, signup, keywords, firstProject, nextAction }: Props) {
+export function DownloadableCareerCard({
+  report,
+  signup,
+  keywords,
+  firstProject,
+  nextAction,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const [sending, setSending] = useState(false);
+
+  const emailProfile = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      await sendCareerProfileEmail({
+        data: { signup, report, keywords, firstProject, nextAction },
+      });
+      toast.success(`Your career profile has been emailed to ${signup.email}.`);
+    } catch {
+      toast.error("Could not send the email. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   const download = async () => {
     if (!ref.current) return;
@@ -31,7 +54,10 @@ export function DownloadableCareerCard({ report, signup, keywords, firstProject,
 
   return (
     <div>
-      <div ref={ref} className="mx-auto max-w-xl rounded-3xl border border-[var(--color-border-soft)] bg-card p-7 shadow-[var(--shadow-lift)]">
+      <div
+        ref={ref}
+        className="mx-auto max-w-xl rounded-3xl border border-[var(--color-border-soft)] bg-card p-7 shadow-[var(--shadow-lift)]"
+      >
         <div className="flex items-center justify-between">
           <span className="font-display text-xl font-extrabold text-primary">
             Humi<span className="text-foreground">.ai</span>
@@ -41,8 +67,12 @@ export function DownloadableCareerCard({ report, signup, keywords, firstProject,
           </span>
         </div>
 
-        <p className="mt-6 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Candidate</p>
-        <p className="text-2xl font-extrabold">{signup.firstName} {signup.lastName}</p>
+        <p className="mt-6 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          Candidate
+        </p>
+        <p className="text-2xl font-extrabold">
+          {signup.firstName} {signup.lastName}
+        </p>
 
         <div className="mt-5 rounded-2xl bg-tint p-4">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">Target role</p>
@@ -56,32 +86,46 @@ export function DownloadableCareerCard({ report, signup, keywords, firstProject,
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Top 3 skills to learn</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Top 3 skills to learn
+            </p>
             <ul className="mt-2 space-y-1 text-sm font-semibold">
-              {report.skillGroups[0]!.skills.slice(0, 3).map((s) => <li key={s.name}>• {s.name}</li>)}
+              {report.skillGroups[0]!.skills.slice(0, 3).map((s) => (
+                <li key={s.name}>• {s.name}</li>
+              ))}
             </ul>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Top 3 AI tools</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Top 3 AI tools
+            </p>
             <ul className="mt-2 space-y-1 text-sm font-semibold">
-              {report.tools.slice(0, 3).map((t) => <li key={t.name}>• {t.name}</li>)}
+              {report.tools.slice(0, 3).map((t) => (
+                <li key={t.name}>• {t.name}</li>
+              ))}
             </ul>
           </div>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="rounded-2xl border border-border p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">First project to build</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              First project to build
+            </p>
             <p className="mt-1 text-sm font-semibold">{firstProject ?? report.path[1]!.items[0]}</p>
           </div>
           <div className="rounded-2xl border border-border p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Next 7-day action</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+              Next 7-day action
+            </p>
             <p className="mt-1 text-sm font-semibold">{nextAction ?? report.path[0]!.items[0]}</p>
           </div>
         </div>
 
         <div className="mt-5 flex items-center justify-between rounded-2xl bg-tint p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">AI readiness score</p>
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+            AI readiness score
+          </p>
           <p className="text-2xl font-extrabold text-primary">{report.aiReadiness}/100</p>
         </div>
 
@@ -99,11 +143,12 @@ export function DownloadableCareerCard({ report, signup, keywords, firstProject,
           Download My Career Card
         </button>
         <button
-          onClick={() => toast.success(`Demo: your career profile would be emailed to ${signup.email}.`)}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--color-border-soft)] bg-tint px-7 py-3.5 text-sm font-bold text-primary transition hover:brightness-97"
+          onClick={emailProfile}
+          disabled={sending}
+          className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--color-border-soft)] bg-tint px-7 py-3.5 text-sm font-bold text-primary transition hover:brightness-97 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Mail className="h-4 w-4" />
-          Email My Career Profile
+          {sending ? "Sending..." : "Email My Career Profile"}
         </button>
       </div>
     </div>

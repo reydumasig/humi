@@ -156,6 +156,38 @@ const reportInputSchema = z.object({
   signup: signupSchema,
 });
 
+// These read as narrower cuts of content already generated elsewhere
+// (automate/assist, tools, chosen role) — deriving them in code instead of
+// asking the model to regenerate similar content saves a full field's worth
+// of generation on every report, without an extra API call.
+function deriveDailyWork(
+  automate: string[],
+  assist: string[],
+): { before: string; after: string }[] {
+  const pairs = assist.slice(0, 2).map((task) => ({
+    before: `Manually handling ${task.toLowerCase()}`,
+    after: "AI drafts it first — you review, refine and finalize",
+  }));
+  const automated = automate.slice(0, 1).map((task) => ({
+    before: `Doing ${task.toLowerCase()} by hand`,
+    after: "Automated — you spend that time on higher-judgment work",
+  }));
+  return [...pairs, ...automated];
+}
+
+function derivePracticePrompts(chosenRole: string): string[] {
+  const role = chosenRole || "your target";
+  return [
+    `Act as an interviewer for a ${role} role. Ask me one question at a time and give feedback on my answer.`,
+    `Give me five behavioral interview questions for a ${role} role and score my answers out of 10.`,
+    `Here is my answer to "tell me about yourself." Make it 60 seconds, clearer and more specific.`,
+  ];
+}
+
+function deriveResumeHighlight(tools: CoreReportOutput["tools"]): string[] {
+  return tools.slice(0, 5).map((t) => t.name);
+}
+
 function assembleReport(
   core: CoreReportOutput,
   resumeFeedback: ResumeFeedbackOutput,
@@ -188,7 +220,7 @@ function assembleReport(
     path: core.path,
     scores,
     aiReadiness: scores.find((s) => s.label === "AI Readiness")!.value,
-    resumeBullets: core.resumeBullets,
+    resumeBullets: resumeFeedback.bulletsNow,
   };
 
   const readiness: ReadinessItem[] = READINESS_LABELS.map(({ key, label }) => {
@@ -220,7 +252,7 @@ function assembleReport(
     resumeAdd: resumeFeedback.resumeAdd,
     resumeReduce: resumeFeedback.resumeReduce,
     resumeMeasurable: resumeFeedback.resumeMeasurable,
-    resumeHighlight: resumeFeedback.resumeHighlight,
+    resumeHighlight: deriveResumeHighlight(core.tools),
     resumeHonesty: resumeFeedback.resumeHonesty,
     rewrites: resumeFeedback.rewrites,
     targetRoles: rolesAndPlan.targetRoles,
@@ -229,12 +261,12 @@ function assembleReport(
     intro: rolesAndPlan.intro,
     interviewQuestions: rolesAndPlan.interviewQuestions,
     answerStructure: ANSWER_STRUCTURE,
-    practicePrompts: rolesAndPlan.practicePrompts,
+    practicePrompts: derivePracticePrompts(interest.chosenRole),
     keywords: rolesAndPlan.keywords,
     safety: SAFETY_TIPS,
     starterPrompts: rolesAndPlan.starterPrompts,
     sevenDays: rolesAndPlan.sevenDays,
-    dailyWork: rolesAndPlan.dailyWork,
+    dailyWork: deriveDailyWork(core.automate, core.assist),
     gapWhy: GAP_WHY,
     toolGroups,
     pathOutputs: PATH_OUTPUTS,

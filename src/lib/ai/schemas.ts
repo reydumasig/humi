@@ -1,5 +1,14 @@
 import { z } from "zod/v4";
 
+// Claude occasionally overshoots a stated array max by 1-2 items even when
+// the schema constrains it — observed on several different fields during
+// testing (rewrites, readiness, interviewQuestions). Rather than treating
+// each overshoot as its own bug, every array bound below carries deliberate
+// headroom above the count we actually want, so a slightly-long list still
+// validates instead of triggering a full fallback to the deterministic
+// engine. Reconstruction code (analysis.functions.ts) already tolerates
+// extra items via `.find()`/`.slice()`, so the headroom is free.
+
 export const RecommendationSchema = z.object({
   title: z.string().describe("A specific, realistic job title"),
   fit: z.string().describe("One sentence: why this candidate's actual background fits this role"),
@@ -7,7 +16,7 @@ export const RecommendationSchema = z.object({
   nextSkills: z
     .array(z.string())
     .min(2)
-    .max(4)
+    .max(6)
     .describe("2-4 concrete skills to learn next for this role"),
 });
 
@@ -32,14 +41,14 @@ export const ResumeAnalysisSchema = z.object({
   skills: z
     .array(z.string())
     .min(4)
-    .max(10)
+    .max(12)
     .describe(
       "Concrete skills actually evidenced in the resume text (tools, languages, methods) — not generic soft skills unless the resume is skill-sparse",
     ),
   recommendations: z
     .array(RecommendationSchema)
     .min(3)
-    .max(4)
+    .max(6)
     .describe(
       "Three career-direction recommendations, ordered best-fit first, appropriately ambitious for this person's actual seniority (do not recommend entry-level roles to a senior candidate or vice versa)",
     ),
@@ -103,26 +112,26 @@ export const CoreReportSchema = z.object({
   strengths: z
     .array(z.string())
     .min(3)
-    .max(6)
+    .max(8)
     .describe("Genuine strengths evidenced in the resume"),
   gaps: z
     .array(z.string())
     .min(2)
-    .max(4)
+    .max(6)
     .describe("Real gaps for their target direction — can be empty-ish for very strong candidates"),
   currentRole: z.string(),
   futureRole: z.string().describe("The AI-enabled evolution of their current role"),
   evolutionExplanation: z.string().describe("1-2 sentences on how their role evolves with AI"),
-  automate: z.array(z.string()).min(3).max(6).describe("Tasks in their role that AI will automate"),
+  automate: z.array(z.string()).min(3).max(8).describe("Tasks in their role that AI will automate"),
   assist: z
     .array(z.string())
     .min(3)
-    .max(6)
+    .max(8)
     .describe("Tasks where AI will assist but not replace them"),
   human: z
     .array(z.string())
     .min(3)
-    .max(6)
+    .max(8)
     .describe("Tasks that stay distinctly human in their role"),
 
   gapsAnalysis: z
@@ -134,15 +143,16 @@ export const CoreReportSchema = z.object({
         nextStep: z.string().describe("One concrete, specific next action to close this gap"),
       }),
     )
-    .length(8)
+    .min(8)
+    .max(11)
     .describe(
       "One entry for each of the 8 fixed gap categories (each key used exactly once), scored honestly for this candidate",
     ),
 
   skillGroups: z
-    .array(z.object({ title: z.string(), skills: z.array(skillCard).min(2).max(4) }))
+    .array(z.object({ title: z.string(), skills: z.array(skillCard).min(2).max(6) }))
     .min(2)
-    .max(4)
+    .max(6)
     .describe(
       "Groups of skills to learn next, grouped by theme, ordered easiest/most-urgent first",
     ),
@@ -150,7 +160,7 @@ export const CoreReportSchema = z.object({
   tools: z
     .array(toolCard)
     .min(4)
-    .max(6)
+    .max(8)
     .describe("AI tools most relevant to this candidate's target role"),
 
   scores: z
@@ -161,24 +171,19 @@ export const CoreReportSchema = z.object({
         note: z.string().describe("Short note explaining the score for this specific candidate"),
       }),
     )
-    .length(5)
+    .min(5)
+    .max(8)
     .describe("One entry for each of the 5 fixed score dimensions (each key used exactly once)"),
 
   path: z
     .array(
-      z.object({ window: z.string(), title: z.string(), items: z.array(z.string()).min(3).max(5) }),
+      z.object({ window: z.string(), title: z.string(), items: z.array(z.string()).min(3).max(7) }),
     )
     .min(3)
-    .max(3)
+    .max(4)
     .describe(
-      "Exactly 3 entries: a 30/60/90-day learning path — window values like 'Days 1-30', 'Days 31-60', 'Days 61-90'",
+      "A 30/60/90-day learning path — window values like 'Days 1-30', 'Days 31-60', 'Days 61-90'",
     ),
-
-  resumeBullets: z
-    .array(z.string())
-    .min(2)
-    .max(3)
-    .describe("Rewritten resume bullets based on their actual experience"),
 });
 export type CoreReportOutput = z.infer<typeof CoreReportSchema>;
 
@@ -196,7 +201,8 @@ export const ResumeFeedbackSchema = z.object({
           ),
       }),
     )
-    .length(8)
+    .min(8)
+    .max(11)
     .describe(
       "One entry for each of the 8 fixed readiness categories (each key used exactly once)",
     ),
@@ -204,29 +210,24 @@ export const ResumeFeedbackSchema = z.object({
   resumeAdd: z
     .array(z.string())
     .min(3)
-    .max(5)
+    .max(7)
     .describe("Specific things this candidate should add to their resume"),
-  resumeReduce: z.array(z.string()).min(2).max(4).describe("Specific things to cut or shorten"),
+  resumeReduce: z.array(z.string()).min(2).max(6).describe("Specific things to cut or shorten"),
   resumeMeasurable: z
     .array(z.string())
     .min(2)
-    .max(4)
+    .max(6)
     .describe("What kinds of numbers/metrics they should quantify"),
-  resumeHighlight: z
-    .array(z.string())
-    .min(3)
-    .max(5)
-    .describe("Skills/tools to highlight prominently"),
   resumeHonesty: z
     .array(z.string())
     .min(2)
-    .max(3)
+    .max(5)
     .describe("Honest-framing guidance for claiming skills"),
 
   rewrites: z
     .array(z.object({ before: z.string(), after: z.string(), earned: z.boolean() }))
     .min(2)
-    .max(4)
+    .max(6)
     .describe(
       "3 before/after resume bullet rewrites using plausible content for this candidate's actual background; mark earned=true if it depends on completing a suggested project",
     ),
@@ -234,7 +235,7 @@ export const ResumeFeedbackSchema = z.object({
   bulletsNow: z
     .array(z.string())
     .min(2)
-    .max(3)
+    .max(5)
     .describe(
       "2-3 resume bullets this candidate can honestly use right now, based on their actual experience",
     ),
@@ -254,12 +255,13 @@ export const RolesAndPlanSchema = z.object({
       }),
     )
     .min(5)
-    .max(8)
+    .max(10)
     .describe("Realistic job titles to apply for, ordered closest-fit first"),
 
   matrixItems: z
-    .array(z.object({ key: z.enum(MATRIX_KEYS), items: z.array(z.string()).min(3).max(5) }))
-    .length(4)
+    .array(z.object({ key: z.enum(MATRIX_KEYS), items: z.array(z.string()).min(3).max(7) }))
+    .min(4)
+    .max(6)
     .describe(
       "One entry for each of the 4 fixed priority tiers (each key used exactly once), tailored to this candidate's actual gaps and level",
     ),
@@ -269,15 +271,15 @@ export const RolesAndPlanSchema = z.object({
       z.object({
         name: z.string(),
         objective: z.string(),
-        tools: z.array(z.string()).min(2).max(4),
-        steps: z.array(z.string()).min(4).max(6),
+        tools: z.array(z.string()).min(2).max(6),
+        steps: z.array(z.string()).min(4).max(8),
         output: z.string().describe("What they'll have at the end"),
         bullet: z.string().describe("A resume bullet they can write once this is done"),
         interview: z.string().describe("A one-sentence talking point for interviews"),
       }),
     )
     .min(2)
-    .max(3)
+    .max(5)
     .describe(
       "Portfolio mini-projects sized appropriately for their actual skill level — do not suggest a beginner project to a senior expert",
     ),
@@ -291,21 +293,15 @@ export const RolesAndPlanSchema = z.object({
   interviewQuestions: z
     .array(z.object({ q: z.string(), tip: z.string() }))
     .min(4)
-    .max(6)
+    .max(8)
     .describe(
       "4-6 likely interview questions for their target role with a specific answering tip each",
     ),
 
-  practicePrompts: z
-    .array(z.string())
-    .min(2)
-    .max(4)
-    .describe("2-4 AI prompts they can use to practice interviewing"),
-
   keywords: z
-    .array(z.object({ title: z.string(), words: z.array(z.string()).min(3).max(8) }))
+    .array(z.object({ title: z.string(), words: z.array(z.string()).min(3).max(10) }))
     .min(4)
-    .max(6)
+    .max(8)
     .describe(
       "5 keyword groups for job search/LinkedIn: Job title keywords, Skills keywords, AI-ready keywords, Industry keywords, LinkedIn profile keywords — in that order",
     ),
@@ -313,29 +309,23 @@ export const RolesAndPlanSchema = z.object({
   starterPrompts: z
     .array(z.string())
     .min(8)
-    .max(10)
+    .max(14)
     .describe("Ready-to-use AI prompts relevant to their target role"),
 
   sevenDays: z
     .array(z.object({ day: z.string(), task: z.string(), detail: z.string() }))
     .min(6)
-    .max(8)
+    .max(9)
     .describe(
       "A 7-day action plan (one entry per day, days labeled 'Day 1'..'Day 7') — exactly 7 entries unless truly impossible",
     ),
-
-  dailyWork: z
-    .array(z.object({ before: z.string(), after: z.string() }))
-    .min(2)
-    .max(4)
-    .describe("2-4 before/after examples of how their actual daily work changes with AI"),
 
   roleTools: z
     .array(
       z.object({ name: z.string(), useCase: z.string(), practice: z.string(), resume: z.string() }),
     )
     .min(3)
-    .max(4)
+    .max(6)
     .describe(
       "3-4 tools specific to their target role (not generic tools like ChatGPT/Excel, which are covered separately)",
     ),

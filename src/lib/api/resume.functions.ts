@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { extractText, getDocumentProxy } from "unpdf";
+import mammoth from "mammoth";
+import WordExtractor from "word-extractor";
 
 const MAX_TEXT_LENGTH = 20000;
 
@@ -34,6 +36,25 @@ export const extractResumeText = createServerFn({ method: "POST" })
       }
     }
 
-    // .doc / .docx text extraction isn't wired up yet.
+    if (name.endsWith(".docx")) {
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const result = await mammoth.extractRawText({ buffer });
+        return { text: result.value.slice(0, MAX_TEXT_LENGTH), supported: true };
+      } catch {
+        return { text: "", supported: false };
+      }
+    }
+
+    if (name.endsWith(".doc")) {
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const doc = await new WordExtractor().extract(buffer);
+        return { text: doc.getBody().slice(0, MAX_TEXT_LENGTH), supported: true };
+      } catch {
+        return { text: "", supported: false };
+      }
+    }
+
     return { text: "", supported: false };
   });

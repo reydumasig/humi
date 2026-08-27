@@ -938,11 +938,19 @@ function guessTitleFromText(text: string, family: Family): string | undefined {
 }
 
 function detectYearsFromText(text: string): string | undefined {
-  const match = text.match(/\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/i);
-  if (!match) return undefined;
-  const n = Number.parseInt(match[1]!, 10);
-  if (Number.isNaN(n) || n <= 0 || n > 50) return undefined;
-  return `${n}+ years`;
+  const pattern = /\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text))) {
+    const windowStart = Math.max(0, match.index - 40);
+    const windowEnd = Math.min(text.length, match.index + match[0].length + 40);
+    const context = text.slice(windowStart, windowEnd).toLowerCase();
+    if (!context.includes("experience") || context.includes("years old")) continue;
+
+    const n = Number.parseInt(match[1]!, 10);
+    if (Number.isNaN(n) || n <= 0 || n > 50) continue;
+    return `${n}+ years`;
+  }
+  return undefined;
 }
 
 /** Mock resume parsing. Swap for a real AI call later — keep the return shape. */

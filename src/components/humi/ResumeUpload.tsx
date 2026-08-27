@@ -62,7 +62,7 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
       const result = await extractResumeText({ data: form });
       if (!result.supported && !hasManualInput) {
         setError(
-          "We can't read this file type automatically yet — add a quick summary below so we get your profile right.",
+          "We couldn't read this file automatically — add a quick summary below so we get your profile right.",
         );
         setManual(true);
         return;

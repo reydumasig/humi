@@ -87,7 +87,7 @@ export const sendCareerProfileEmail = createServerFn({ method: "POST" })
 
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
-      from: "Humi.ai <onboarding@resend.dev>",
+      from: "Humi.ai <career@humi.nablly.com>",
       to: data.signup.email,
       subject: `${data.signup.firstName}, your Career Evolution Profile is ready`,
       html: buildEmailHtml(data),

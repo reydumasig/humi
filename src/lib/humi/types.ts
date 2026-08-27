@@ -18,6 +18,7 @@ export interface SignupData {
 
 export interface ResumeInput {
   fileName?: string;
+  resumeText?: string;
   recentRole: string;
   experienceSummary: string;
   keySkills: string;

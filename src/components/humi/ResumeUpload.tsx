@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FileText, Sparkles, Upload, X } from "lucide-react";
+import { extractResumeText } from "@/lib/api/resume.functions";
 import type { ResumeInput } from "@/lib/humi/types";
 
 const field =
@@ -17,6 +18,7 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
   const [manual, setManual] = useState(!!initial?.recentRole);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const [extracting, setExtracting] = useState(false);
   const [data, setData] = useState<ResumeInput>({
     recentRole: initial?.recentRole ?? "",
     experienceSummary: initial?.experienceSummary ?? "",
@@ -39,12 +41,38 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
     setFile(candidate);
   };
 
-  const submit = () => {
-    if (!fileName && !data.recentRole.trim() && !data.keySkills.trim()) {
+  const hasManualInput = data.recentRole.trim() || data.keySkills.trim();
+
+  const submit = async () => {
+    if (!fileName && !hasManualInput) {
       setError("Upload a resume or enter your experience manually to continue.");
       return;
     }
-    onSubmit({ ...data, fileName }, file);
+
+    if (!file) {
+      onSubmit({ ...data, fileName }, file);
+      return;
+    }
+
+    setExtracting(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.set("resume", file);
+      const result = await extractResumeText({ data: form });
+      if (!result.supported && !hasManualInput) {
+        setError(
+          "We can't read this file type automatically yet — add a quick summary below so we get your profile right.",
+        );
+        setManual(true);
+        return;
+      }
+      onSubmit({ ...data, fileName, resumeText: result.text }, file);
+    } catch {
+      onSubmit({ ...data, fileName }, file);
+    } finally {
+      setExtracting(false);
+    }
   };
 
   return (
@@ -181,10 +209,11 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
 
         <button
           onClick={submit}
-          className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-7 py-4 text-base font-bold text-primary-foreground shadow-[var(--shadow-lift)] transition hover:brightness-110 sm:w-auto"
+          disabled={extracting}
+          className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-7 py-4 text-base font-bold text-primary-foreground shadow-[var(--shadow-lift)] transition hover:brightness-110 disabled:opacity-60 sm:w-auto"
         >
           <Sparkles className="h-4 w-4" />
-          Analyze My Resume
+          {extracting ? "Reading your resume…" : "Analyze My Resume"}
         </button>
 
         <p className="mt-4 text-xs text-muted-foreground">

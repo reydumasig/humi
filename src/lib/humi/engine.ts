@@ -806,9 +806,156 @@ function titleCase(s: string) {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const SKILL_VOCAB: string[] = [
+  "Java",
+  "Python",
+  "JavaScript",
+  "TypeScript",
+  "SQL",
+  "C#",
+  "C++",
+  "Go",
+  "Ruby",
+  "PHP",
+  "React",
+  "Next.js",
+  "Angular",
+  "Vue",
+  "Node.js",
+  "Spring Boot",
+  "Spring",
+  "Django",
+  "Flask",
+  ".NET",
+  "REST API",
+  "GraphQL",
+  "Microservices",
+  "Kubernetes",
+  "Docker",
+  "Kafka",
+  "AWS",
+  "Azure",
+  "GCP",
+  "CI/CD",
+  "Jenkins",
+  "GitHub Actions",
+  "GitLab CI/CD",
+  "Terraform",
+  "Distributed Systems",
+  "System Design",
+  "PostgreSQL",
+  "MySQL",
+  "MongoDB",
+  "Oracle",
+  "Redis",
+  "Data Analysis",
+  "Machine Learning",
+  "Artificial Intelligence",
+  "Excel",
+  "Power BI",
+  "Tableau",
+  "SEO",
+  "Google Ads",
+  "Content Marketing",
+  "Social Media",
+  "CRM",
+  "Salesforce",
+  "HubSpot",
+  "Negotiation",
+  "Account Management",
+  "Lead Generation",
+  "Recruiting",
+  "Payroll",
+  "Onboarding",
+  "Talent Acquisition",
+  "Bookkeeping",
+  "Financial Analysis",
+  "Auditing",
+  "Reconciliation",
+  "Supply Chain",
+  "Logistics",
+  "Inventory Management",
+  "Procurement",
+  "Project Management",
+  "Scrum",
+  "Agile",
+  "Product Management",
+  "Roadmapping",
+  "Figma",
+  "UX Design",
+  "UI Design",
+  "Graphic Design",
+  "Video Editing",
+  "Illustration",
+  "Data Entry",
+  "Customer Service",
+  "Technical Support",
+  "Networking",
+  "Compliance",
+  "Risk Management",
+  "Contract Review",
+  "Teaching",
+  "Curriculum Design",
+  "Retail Operations",
+  "Merchandising",
+  "Point of Sale",
+  "Leadership",
+  "Team Management",
+  "Code Reviews",
+  "Production Troubleshooting",
+];
+
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function detectSkillsFromText(text: string): string[] {
+  if (!text) return [];
+  const found: string[] = [];
+  for (const skill of SKILL_VOCAB) {
+    const pattern = new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(skill)}(?![A-Za-z0-9])`, "i");
+    if (pattern.test(text)) found.push(skill);
+    if (found.length >= 10) break;
+  }
+  return found;
+}
+
+function guessTitleFromText(text: string, family: Family): string | undefined {
+  if (!text) return undefined;
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  for (const line of lines) {
+    if (line.length < 4 || line.length > 60) continue;
+    const lower = line.toLowerCase();
+    if (family.keywords.some((k) => lower.includes(k))) {
+      return titleCase(line.replace(/[|,•].*$/, "").trim());
+    }
+  }
+  return undefined;
+}
+
+function detectYearsFromText(text: string): string | undefined {
+  const match = text.match(/\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/i);
+  if (!match) return undefined;
+  const n = Number.parseInt(match[1]!, 10);
+  if (Number.isNaN(n) || n <= 0 || n > 50) return undefined;
+  return `${n}+ years`;
+}
+
 /** Mock resume parsing. Swap for a real AI call later — keep the return shape. */
 export function parseResume(input: ResumeInput, signup: SignupData): ParsedResume {
-  const blob = [input.recentRole, input.experienceSummary, input.keySkills, input.industries, input.fileName]
+  const resumeText = (input.resumeText ?? "").slice(0, 6000);
+  const blob = [
+    resumeText,
+    input.recentRole,
+    input.experienceSummary,
+    input.keySkills,
+    input.industries,
+    input.fileName,
+  ]
     .filter(Boolean)
     .join(" ");
   const familyKey = detectFamily(blob);
@@ -821,11 +968,17 @@ export function parseResume(input: ResumeInput, signup: SignupData): ParsedResum
     .slice(0, 10)
     .map(titleCase);
 
-  const skills = typedSkills.length >= 3 ? typedSkills : Array.from(new Set([...typedSkills, ...family.defaultSkills])).slice(0, 8);
+  const textSkills = detectSkillsFromText(resumeText);
+
+  const skills =
+    typedSkills.length >= 3
+      ? typedSkills
+      : Array.from(new Set([...typedSkills, ...textSkills, ...family.defaultSkills])).slice(0, 8);
 
   const stage = signup.careerStage || "Early Career";
   const years =
-    stage === "Student / Fresh Graduate"
+    detectYearsFromText(resumeText) ??
+    (stage === "Student / Fresh Graduate"
       ? "0–1 years"
       : stage === "Early Career"
         ? "1–3 years"
@@ -833,9 +986,12 @@ export function parseResume(input: ResumeInput, signup: SignupData): ParsedResum
           ? "4–8 years"
           : stage === "Senior Professional"
             ? "8+ years"
-            : "Varied experience";
+            : "Varied experience");
 
-  const recentRole = input.recentRole.trim() || family.label + " Professional";
+  const recentRole =
+    input.recentRole.trim() ||
+    guessTitleFromText(resumeText, family) ||
+    family.label + " Professional";
 
   const summary = `You appear to have experience in ${skills.slice(0, 4).join(", ").toLowerCase()}, built through work close to ${family.label.toLowerCase()}. Your profile suggests strength in delivering consistent day-to-day results and working with people across teams. This positions you well for roles such as ${family.recommendations
     .slice(0, 2)

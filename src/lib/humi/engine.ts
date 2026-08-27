@@ -786,7 +786,7 @@ export const FAMILIES: Family[] = [
   },
 ];
 
-export function getFamily(key: FamilyKey): Family {
+export function getFamily(key: FamilyKey | undefined): Family {
   return FAMILIES.find((f) => f.key === key) ?? FAMILIES[FAMILIES.length - 1]!;
 }
 
@@ -1018,7 +1018,7 @@ export function parseResume(input: ResumeInput, signup: SignupData): ParsedResum
   };
 }
 
-export function getRecommendations(key: FamilyKey): Recommendation[] {
+export function getRecommendations(key: FamilyKey | undefined): Recommendation[] {
   return getFamily(key).recommendations;
 }
 

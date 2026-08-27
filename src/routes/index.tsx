@@ -12,9 +12,18 @@ import { ResumeParsingLoader } from "@/components/humi/ResumeParsingLoader";
 import { ResumeSummary } from "@/components/humi/ResumeSummary";
 import { CareerInterestForm } from "@/components/humi/CareerInterestForm";
 import { CareerEvolutionReport } from "@/components/humi/CareerEvolutionReport";
-import { SAMPLE_PROFILES, buildReport, getRecommendations, parseResume } from "@/lib/humi/engine";
+import { SAMPLE_PROFILES } from "@/lib/humi/engine";
 import { submitLead } from "@/lib/api/leads.functions";
-import type { InterestData, ParsedResume, Report, ResumeInput, SignupData } from "@/lib/humi/types";
+import { analyzeResume, generateCareerReport } from "@/lib/api/analysis.functions";
+import type { Counselling } from "@/lib/humi/counselling";
+import type {
+  InterestData,
+  ParsedResume,
+  Recommendation,
+  Report,
+  ResumeInput,
+  SignupData,
+} from "@/lib/humi/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,7 +47,16 @@ export const Route = createFileRoute("/")({
   component: HumiApp,
 });
 
-type Step = "welcome" | "signup" | "upload" | "parsing" | "summary" | "interest" | "report";
+type Step =
+  "welcome" | "signup" | "upload" | "parsing" | "summary" | "interest" | "generating" | "report";
+
+const GENERATING_MESSAGES = [
+  "Reviewing your career direction…",
+  "Scoring your resume readiness…",
+  "Building your 30-60-90 day plan…",
+  "Picking AI tools worth learning…",
+  "Assembling your full report…",
+];
 
 function HumiApp() {
   const [step, setStep] = useState<Step>("welcome");
@@ -46,46 +64,74 @@ function HumiApp() {
   const [signupPrefill, setSignupPrefill] = useState<Partial<SignupData>>();
   const [resumePrefill, setResumePrefill] = useState<Partial<ResumeInput>>();
   const [parsed, setParsed] = useState<ParsedResume | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [report, setReport] = useState<Report | null>(null);
-  const [interest, setInterest] = useState<InterestData | null>(null);
+  const [counselling, setCounselling] = useState<Counselling | null>(null);
   const [resumeFile, setResumeFile] = useState<File | undefined>();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
-  const runParse = (input: ResumeInput, who: SignupData, file?: File) => {
+  const runParse = async (input: ResumeInput, who: SignupData, file?: File) => {
     setResumeFile(file);
     setStep("parsing");
-    setTimeout(() => {
-      setParsed(parseResume(input, who));
+    try {
+      const { parsed: analyzed, recommendations: recs } = await analyzeResume({
+        data: {
+          resumeText: input.resumeText,
+          manual: {
+            recentRole: input.recentRole,
+            experienceSummary: input.experienceSummary,
+            keySkills: input.keySkills,
+            industries: input.industries,
+          },
+          signup: who,
+        },
+      });
+      setParsed({ ...analyzed, fileName: input.fileName });
+      setRecommendations(recs);
       setStep("summary");
-    }, 2800);
+    } catch (err) {
+      console.error("Failed to analyze resume", err);
+      toast.error("Something went wrong analyzing your resume. Please try again.");
+      setStep("upload");
+    }
   };
 
-  const finish = (interestData: InterestData) => {
+  const finish = async (interestData: InterestData) => {
     if (!parsed || !signup) return;
-    const built = buildReport(parsed, interestData, signup);
-    setInterest(interestData);
-    setReport(built);
+    setStep("generating");
 
-    const form = new FormData();
-    form.set("firstName", signup.firstName);
-    form.set("lastName", signup.lastName);
-    form.set("email", signup.email);
-    form.set("phone", signup.phone);
-    form.set("careerStage", signup.careerStage || "Not specified");
-    form.set("recommendedRole", built.futureRole);
-    form.set("careerInterest", `${interestData.chosenRole} · ${interestData.industry}`);
-    form.set("aiReadiness", String(built.aiReadiness));
-    if (resumeFile) form.set("resume", resumeFile);
+    try {
+      const { report: built, counselling: builtCounselling } = await generateCareerReport({
+        data: { parsed, interest: interestData, signup },
+      });
+      setReport(built);
+      setCounselling(builtCounselling);
 
-    submitLead({ data: form }).catch((err) => {
-      console.error("Failed to save candidate lead", err);
-      toast.error("We couldn't save your submission, but your report is ready below.");
-    });
+      const form = new FormData();
+      form.set("firstName", signup.firstName);
+      form.set("lastName", signup.lastName);
+      form.set("email", signup.email);
+      form.set("phone", signup.phone);
+      form.set("careerStage", signup.careerStage || "Not specified");
+      form.set("recommendedRole", built.futureRole);
+      form.set("careerInterest", `${interestData.chosenRole} · ${interestData.industry}`);
+      form.set("aiReadiness", String(built.aiReadiness));
+      if (resumeFile) form.set("resume", resumeFile);
 
-    setStep("report");
+      submitLead({ data: form }).catch((err) => {
+        console.error("Failed to save candidate lead", err);
+        toast.error("We couldn't save your submission, but your report is ready below.");
+      });
+
+      setStep("report");
+    } catch (err) {
+      console.error("Failed to generate career report", err);
+      toast.error("Something went wrong generating your report. Please try again.");
+      setStep("interest");
+    }
   };
 
   const loadSample = (index: number) => {
@@ -103,10 +149,8 @@ function HumiApp() {
     setSignup(who);
     setSignupPrefill(s.signup);
     setResumePrefill(s.resume);
-    runParse(s.resume, who);
+    void runParse(s.resume, who);
   };
-
-  const recommendations = parsed ? getRecommendations(parsed.familyKey) : [];
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -176,20 +220,27 @@ function HumiApp() {
         {step === "interest" && (
           <CareerInterestForm key="interest" recommendations={recommendations} onSubmit={finish} />
         )}
-        {step === "report" && report && parsed && signup && (
+        {step === "generating" && (
+          <ResumeParsingLoader
+            key="generating"
+            title="Building Your Career Evolution Report"
+            messages={GENERATING_MESSAGES}
+          />
+        )}
+        {step === "report" && report && counselling && parsed && signup && (
           <CareerEvolutionReport
             key="report"
             report={report}
+            counselling={counselling}
             parsed={parsed}
             signup={signup}
-            interestRole={interest?.chosenRole}
-            interestIndustry={interest?.industry}
             onRestart={() => {
               setStep("welcome");
               setReport(null);
+              setCounselling(null);
               setParsed(null);
+              setRecommendations([]);
               setSignup(null);
-              setInterest(null);
 
               setSignupPrefill(undefined);
               setResumePrefill(undefined);

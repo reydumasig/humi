@@ -480,7 +480,7 @@ export function buildCounselling(
   report: Report,
 ): Counselling {
   const family = getFamily(parsed.familyKey);
-  const fc = FAMILY_COUNSEL[parsed.familyKey] ?? FAMILY_COUNSEL.general;
+  const fc = (parsed.familyKey && FAMILY_COUNSEL[parsed.familyKey]) || FAMILY_COUNSEL.general;
   const targetRole = interest.chosenRole || family.recommendations[0]!.title;
   const stage = signup.careerStage || "Early Career";
   const experienced = ["Mid-Career", "Senior Professional"].includes(stage);

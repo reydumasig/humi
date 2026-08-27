@@ -29,7 +29,7 @@ export interface ParsedResume {
   fileName?: string;
   recentRole: string;
   primaryFunction: string;
-  familyKey: FamilyKey;
+  familyKey?: FamilyKey;
   yearsExperience: string;
   industryExposure: string;
   summary: string;

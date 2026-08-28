@@ -8,4 +8,4 @@ export function getAnthropicClient() {
   return new Anthropic({ apiKey });
 }
 
-export const CLAUDE_MODEL = "claude-opus-5";
+export const CLAUDE_MODEL = "claude-sonnet-5";

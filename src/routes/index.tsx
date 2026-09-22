@@ -15,6 +15,7 @@ import { CareerEvolutionReport } from "@/components/humi/CareerEvolutionReport";
 import { SAMPLE_PROFILES } from "@/lib/humi/engine";
 import { submitLead } from "@/lib/api/leads.functions";
 import { analyzeResume, generateCareerReport } from "@/lib/api/analysis.functions";
+import { saveProfile } from "@/lib/humi/candidate-profile";
 import type { Counselling } from "@/lib/humi/counselling";
 import type {
   InterestData,
@@ -110,6 +111,19 @@ function HumiApp() {
       setReport(built);
       setCounselling(builtCounselling);
 
+      saveProfile({
+        firstName: signup.firstName,
+        lastName: signup.lastName,
+        email: signup.email,
+        phone: signup.phone,
+        familyKey: parsed.familyKey,
+        primaryFunction: parsed.primaryFunction,
+        currentRole: built.currentRole,
+        futureRole: built.futureRole,
+        skills: parsed.skills,
+        interestRole: interestData.chosenRole,
+      });
+
       const form = new FormData();
       form.set("firstName", signup.firstName);
       form.set("lastName", signup.lastName);
@@ -182,7 +196,7 @@ function HumiApp() {
               to="/admin"
               className="text-xs font-semibold text-muted-foreground hover:text-primary"
             >
-              Leads
+              Admin
             </Link>
           </div>
         </div>

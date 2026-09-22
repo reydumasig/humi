@@ -121,3 +121,58 @@ export interface Lead {
   aiReadiness: number;
   createdAt: string;
 }
+
+export type WorkType = "Onsite" | "Hybrid" | "Remote";
+
+export interface JobPosting {
+  id: string;
+  title: string;
+  company: string;
+  companyBlurb: string;
+  location: string;
+  workType: WorkType;
+  salary: string;
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+  aiTools: string;
+  skills: string[];
+  families: FamilyKey[];
+  interviewDates: string[];
+  interviewSlots: string[];
+  interviewMode: "Video call" | "Onsite" | "Phone call";
+  active: boolean;
+  createdAt: string;
+}
+
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  candidateName: string;
+  email: string;
+  phone: string;
+  note: string;
+  interviewDate: string;
+  interviewTime: string;
+  interviewMode: string;
+  createdAt: string;
+}
+
+// Persisted client-side only (localStorage) so the standalone /jobs pages can
+// prefill and match against the candidate who just left the report flow —
+// there is no candidate login, so this device-local snapshot is the only
+// link between a report and a later jobs-page visit.
+export interface CandidateProfile {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  familyKey?: FamilyKey;
+  primaryFunction: string;
+  currentRole: string;
+  futureRole: string;
+  skills: string[];
+  interestRole: string;
+}

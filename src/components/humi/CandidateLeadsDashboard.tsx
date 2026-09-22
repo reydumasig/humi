@@ -1,15 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { Download, ExternalLink, LogOut } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import { getLeads } from "@/lib/api/leads.functions";
-import { adminLogout } from "@/lib/api/admin-auth.functions";
 
 interface Props {
   adminEmail?: string;
 }
 
 export function CandidateLeadsDashboard({ adminEmail }: Props) {
-  const navigate = useNavigate();
   const {
     data: leads = [],
     isLoading,
@@ -18,11 +15,6 @@ export function CandidateLeadsDashboard({ adminEmail }: Props) {
     queryKey: ["admin-leads"],
     queryFn: () => getLeads(),
   });
-
-  const logout = async () => {
-    await adminLogout();
-    navigate({ to: "/admin-login" });
-  };
 
   const exportCsv = () => {
     const head = "Name,Email,Phone,Stage,Resume,Recommended Role,Interest,AI Readiness,Captured";
@@ -50,22 +42,11 @@ export function CandidateLeadsDashboard({ adminEmail }: Props) {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-12">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold">Candidate Leads</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {adminEmail && <>Signed in as {adminEmail} · </>}
-            {leads.length} candidate{leads.length === 1 ? "" : "s"} captured.
-          </p>
-        </div>
-        <button
-          onClick={logout}
-          className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"
-        >
-          <LogOut className="h-4 w-4" /> Log out
-        </button>
-      </div>
+    <div>
+      <p className="text-sm text-muted-foreground">
+        {adminEmail && <>Signed in as {adminEmail} · </>}
+        {leads.length} candidate{leads.length === 1 ? "" : "s"} captured.
+      </p>
 
       <div className="mt-5 flex gap-3">
         <button
@@ -144,6 +125,6 @@ export function CandidateLeadsDashboard({ adminEmail }: Props) {
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   );
 }

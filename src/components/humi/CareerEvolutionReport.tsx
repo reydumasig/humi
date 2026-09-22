@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight, Briefcase } from "lucide-react";
 import type { ParsedResume, Report, SignupData } from "@/lib/humi/types";
 import type { Counselling } from "@/lib/humi/counselling";
 import {
@@ -79,6 +80,13 @@ export function CareerEvolutionReport({
           This is a practical plan, not a verdict. It shows what role to target, what to fix on your
           resume, what to learn first, what to build, and exactly what to do in the next 7 days.
         </p>
+
+        <Link
+          to="/jobs"
+          className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110"
+        >
+          <Briefcase className="h-4 w-4" /> See matching jobs
+        </Link>
 
         <Section n={1} title="Your Career Starting Point">
           <div className="surface-card p-6">
@@ -364,9 +372,15 @@ export function CareerEvolutionReport({
         </Section>
 
         <div className="mt-14 border-t border-border pt-6 text-center">
+          <Link
+            to="/jobs"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110"
+          >
+            <Briefcase className="h-4 w-4" /> See matching jobs
+          </Link>
           <button
             onClick={onRestart}
-            className="rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary"
+            className="ml-3 rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary"
           >
             Start a new career profile
           </button>

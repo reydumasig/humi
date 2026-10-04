@@ -40,7 +40,16 @@ export async function exportSectionsToPdf(
 
   for (let i = 0; i < nodes.length; i++) {
     onProgress?.(i, nodes.length);
-    const canvas = await toCanvas(nodes[i]!, { pixelRatio: 1.5, backgroundColor: "#ffffff" });
+    // Sections reveal via a scroll-triggered fade-in (framer-motion
+    // whileInView, starting at opacity 0) - anything not yet scrolled past
+    // is still invisible in the live DOM at capture time. The style override
+    // only touches html-to-image's cloned node, not the real page, so forcing
+    // it visible here doesn't affect what the user sees on screen.
+    const canvas = await toCanvas(nodes[i]!, {
+      pixelRatio: 1.5,
+      backgroundColor: "#ffffff",
+      style: { opacity: "1", transform: "none" },
+    });
     const scale = CONTENT_WIDTH / canvas.width;
     const drawHeight = canvas.height * scale;
 

@@ -1,6 +1,9 @@
+import { forwardRef, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Briefcase } from "lucide-react";
+import { ArrowRight, Briefcase, Download } from "lucide-react";
+import { toast } from "sonner";
+import { exportSectionsToPdf } from "@/lib/humi/pdf-export";
 import type { ParsedResume, Report, SignupData } from "@/lib/humi/types";
 import type { Counselling } from "@/lib/humi/counselling";
 import {
@@ -25,19 +28,13 @@ import { JobSearchKeywords } from "./JobSearchKeywords";
 import { ProfessionalAIUse, StarterPrompts } from "./ProfessionalAIUse";
 import { SevenDayPlan } from "./SevenDayPlan";
 
-function Section({
-  n,
-  title,
-  subtitle,
-  children,
-}: {
-  n: number;
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
+const Section = forwardRef<
+  HTMLElement,
+  { n: number; title: string; subtitle?: string; children: React.ReactNode }
+>(function Section({ n, title, subtitle, children }, ref) {
   return (
     <motion.section
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
@@ -50,7 +47,7 @@ function Section({
       <div className="mt-6">{children}</div>
     </motion.section>
   );
-}
+});
 
 interface Props {
   report: Report;
@@ -69,26 +66,73 @@ export function CareerEvolutionReport({
 }: Props) {
   const topSkills = c.matrix[0]!.items;
 
+  const headerRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<number, HTMLElement | null>>({});
+  const setSectionRef = (n: number) => (el: HTMLElement | null) => {
+    sectionRefs.current[n] = el;
+  };
+  const [pdfState, setPdfState] = useState<{ generating: boolean; done: number; total: number }>({
+    generating: false,
+    done: 0,
+    total: 0,
+  });
+
+  const downloadFullReport = async () => {
+    if (pdfState.generating) return;
+    const nodes = [headerRef.current, ...Object.values(sectionRefs.current)].filter(
+      (el): el is HTMLElement => el !== null,
+    );
+    if (!nodes.length) return;
+
+    setPdfState({ generating: true, done: 0, total: nodes.length });
+    try {
+      await exportSectionsToPdf(
+        nodes,
+        `Humi-Career-Report-${signup.firstName || "candidate"}.pdf`,
+        (done, total) => setPdfState({ generating: true, done, total }),
+      );
+    } catch {
+      toast.error("Could not generate the full report PDF. Please try again.");
+    } finally {
+      setPdfState({ generating: false, done: 0, total: 0 });
+    }
+  };
+
   return (
     <div className="px-5 py-10">
       <div className="mx-auto max-w-6xl">
-        <div className="brand-badge">Your Humi.ai Career Evolution</div>
-        <h2 className="mt-4 text-3xl font-extrabold sm:text-4xl">
-          {signup.firstName}, here's how your career can evolve with AI
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          This is a practical plan, not a verdict. It shows what role to target, what to fix on your
-          resume, what to learn first, what to build, and exactly what to do in the next 7 days.
-        </p>
+        <div ref={headerRef} className="bg-background">
+          <div className="brand-badge">Your Humi.ai Career Evolution</div>
+          <h2 className="mt-4 text-3xl font-extrabold sm:text-4xl">
+            {signup.firstName}, here's how your career can evolve with AI
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+            This is a practical plan, not a verdict. It shows what role to target, what to fix on
+            your resume, what to learn first, what to build, and exactly what to do in the next 7
+            days.
+          </p>
+        </div>
 
-        <Link
-          to="/jobs"
-          className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110"
-        >
-          <Briefcase className="h-4 w-4" /> See matching jobs
-        </Link>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            to="/jobs"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110"
+          >
+            <Briefcase className="h-4 w-4" /> See matching jobs
+          </Link>
+          <button
+            onClick={downloadFullReport}
+            disabled={pdfState.generating}
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary transition hover:brightness-97 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {pdfState.generating
+              ? `Preparing PDF… (${pdfState.done}/${pdfState.total})`
+              : "Download Full Report (PDF)"}
+          </button>
+        </div>
 
-        <Section n={1} title="Your Career Starting Point">
+        <Section n={1} title="Your Career Starting Point" ref={setSectionRef(1)}>
           <div className="surface-card p-6">
             <p className="text-sm leading-relaxed text-muted-foreground">{report.startingPoint}</p>
             <p className="mt-4 rounded-2xl bg-tint p-4 text-sm leading-relaxed">
@@ -133,6 +177,7 @@ export function CareerEvolutionReport({
           n={2}
           title="Your Resume Readiness Review"
           subtitle="How ready your resume is for future-ready roles today — and the fastest fixes."
+          ref={setSectionRef(2)}
         >
           <ResumeReadinessReview items={c.readiness} average={c.readinessAverage} />
         </Section>
@@ -141,11 +186,12 @@ export function CareerEvolutionReport({
           n={3}
           title="How to Improve Your Resume"
           subtitle="Specific, practical changes you can make this week."
+          ref={setSectionRef(3)}
         >
           <ResumeImprovement c={c} />
         </Section>
 
-        <Section n={4} title="Your Role Evolution">
+        <Section n={4} title="Your Role Evolution" ref={setSectionRef(4)}>
           <div className="grid items-stretch gap-5 md:grid-cols-[1fr_auto_1fr]">
             <div className="surface-card p-6">
               <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -188,6 +234,7 @@ export function CareerEvolutionReport({
           n={5}
           title="Roles You Can Start Targeting"
           subtitle="Realistic job titles based on your resume signals and interest."
+          ref={setSectionRef(5)}
         >
           <TargetRoles roles={c.targetRoles} />
         </Section>
@@ -196,11 +243,12 @@ export function CareerEvolutionReport({
           n={6}
           title="AI Impact Map"
           subtitle="AI will change the task mix inside your role — your human skills become more valuable."
+          ref={setSectionRef(6)}
         >
           <AIImpactMap report={report} />
         </Section>
 
-        <Section n={7} title="Your Skill Gap Analysis">
+        <Section n={7} title="Your Skill Gap Analysis" ref={setSectionRef(7)}>
           <SkillGapAnalysis gaps={report.gapsAnalysis} why={c.gapWhy} />
         </Section>
 
@@ -208,6 +256,7 @@ export function CareerEvolutionReport({
           n={8}
           title="What to Learn First"
           subtitle="A simple priority matrix so you never have to guess where to start."
+          ref={setSectionRef(8)}
         >
           <SkillPriorityMatrix matrix={c.matrix} />
         </Section>
@@ -216,6 +265,7 @@ export function CareerEvolutionReport({
           n={9}
           title="Skills You Should Learn Next"
           subtitle="Start with the top five. Open the groups below only when you are ready for more."
+          ref={setSectionRef(9)}
         >
           <div className="tint-card p-6">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
@@ -267,6 +317,7 @@ export function CareerEvolutionReport({
           n={10}
           title="Recommended AI Tools to Explore"
           subtitle="Grouped so you know exactly which tool to open first."
+          ref={setSectionRef(10)}
         >
           <ToolRecommendations groups={c.toolGroups} />
         </Section>
@@ -275,6 +326,7 @@ export function CareerEvolutionReport({
           n={11}
           title="Mini Projects You Can Build to Prove Your AI Readiness"
           subtitle="This is a practical way to prove your readiness — finish one, then talk about it in interviews."
+          ref={setSectionRef(11)}
         >
           <PortfolioProjects projects={c.projects} />
         </Section>
@@ -283,6 +335,7 @@ export function CareerEvolutionReport({
           n={12}
           title="Your 30-60-90 Day Career Learning Path"
           subtitle="Each phase ends with something tangible you can show."
+          ref={setSectionRef(12)}
         >
           <LearningPath path={report.path} outputs={c.pathOutputs} />
         </Section>
@@ -291,11 +344,12 @@ export function CareerEvolutionReport({
           n={13}
           title="Career Opportunity Score"
           subtitle="Here is how each score is calculated and what raises it."
+          ref={setSectionRef(13)}
         >
           <CareerScoreCard report={report} explainers={c.scoreExplainers} />
         </Section>
 
-        <Section n={14} title="Your AI-Ready Interview Preparation">
+        <Section n={14} title="Your AI-Ready Interview Preparation" ref={setSectionRef(14)}>
           <InterviewPrep c={c} />
         </Section>
 
@@ -303,6 +357,7 @@ export function CareerEvolutionReport({
           n={15}
           title="Keywords to Use in Your Job Search"
           subtitle="Use these in job searches, applications and your LinkedIn profile."
+          ref={setSectionRef(15)}
         >
           <JobSearchKeywords groups={c.keywords} />
         </Section>
@@ -311,11 +366,17 @@ export function CareerEvolutionReport({
           n={16}
           title="How to Use AI Professionally"
           subtitle="Simple habits that keep your AI use safe, honest and credible."
+          ref={setSectionRef(16)}
         >
           <ProfessionalAIUse items={c.safety} />
         </Section>
 
-        <Section n={17} title="Prompts You Can Use Today" subtitle="Tap any prompt to copy it.">
+        <Section
+          n={17}
+          title="Prompts You Can Use Today"
+          subtitle="Tap any prompt to copy it."
+          ref={setSectionRef(17)}
+        >
           <StarterPrompts prompts={c.starterPrompts} />
         </Section>
 
@@ -323,6 +384,7 @@ export function CareerEvolutionReport({
           n={18}
           title="Future Resume Bullets"
           subtitle="Some you can use today. Others you earn by finishing a project."
+          ref={setSectionRef(18)}
         >
           <div className="grid gap-5 md:grid-cols-2">
             <div>
@@ -357,6 +419,7 @@ export function CareerEvolutionReport({
           n={19}
           title="Your Next 7 Days"
           subtitle={`A short, personalized plan for a ${report.futureRole} track.`}
+          ref={setSectionRef(19)}
         >
           <SevenDayPlan days={c.sevenDays} />
         </Section>
@@ -371,7 +434,7 @@ export function CareerEvolutionReport({
           />
         </Section>
 
-        <div className="mt-14 border-t border-border pt-6 text-center">
+        <div className="mt-14 flex flex-wrap items-center justify-center gap-3 border-t border-border pt-6 text-center">
           <Link
             to="/jobs"
             className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition hover:brightness-110"
@@ -379,8 +442,18 @@ export function CareerEvolutionReport({
             <Briefcase className="h-4 w-4" /> See matching jobs
           </Link>
           <button
+            onClick={downloadFullReport}
+            disabled={pdfState.generating}
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary transition hover:brightness-97 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {pdfState.generating
+              ? `Preparing PDF… (${pdfState.done}/${pdfState.total})`
+              : "Download Full Report (PDF)"}
+          </button>
+          <button
             onClick={onRestart}
-            className="ml-3 rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary"
+            className="rounded-full border border-[var(--color-border-soft)] bg-tint px-6 py-3 text-sm font-bold text-primary"
           >
             Start a new career profile
           </button>

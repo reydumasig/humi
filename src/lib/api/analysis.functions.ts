@@ -13,19 +13,6 @@ import {
   type RolesAndPlanOutput,
 } from "../ai/schemas";
 import {
-  GAP_CATEGORIES,
-  READINESS_LABELS,
-  SCORE_LABELS,
-  MATRIX_SECTIONS,
-  ANSWER_STRUCTURE,
-  SAFETY_TIPS,
-  GAP_WHY,
-  SCORE_EXPLAINERS,
-  PATH_OUTPUTS,
-  STATIC_TOOL_GROUPS,
-  statusFor,
-} from "../ai/static-content";
-import {
   parseResume as fallbackParseResume,
   buildReport as fallbackBuildReport,
   getRecommendations as fallbackGetRecommendations,
@@ -33,9 +20,8 @@ import {
 import {
   buildCounselling as fallbackBuildCounselling,
   type Counselling,
-  type ReadinessItem,
 } from "../humi/counselling";
-import type { InterestData, ParsedResume, Recommendation, Report, SignupData } from "../humi/types";
+import type { ParsedResume, Recommendation, Report, SignupData } from "../humi/types";
 
 const signupSchema = z.object({
   firstName: z.string(),
@@ -156,128 +142,6 @@ const reportInputSchema = z.object({
   signup: signupSchema,
 });
 
-// These read as narrower cuts of content already generated elsewhere
-// (automate/assist, tools, chosen role) — deriving them in code instead of
-// asking the model to regenerate similar content saves a full field's worth
-// of generation on every report, without an extra API call.
-function deriveDailyWork(
-  automate: string[],
-  assist: string[],
-): { before: string; after: string }[] {
-  const pairs = assist.slice(0, 2).map((task) => ({
-    before: `Manually handling ${task.toLowerCase()}`,
-    after: "AI drafts it first — you review, refine and finalize",
-  }));
-  const automated = automate.slice(0, 1).map((task) => ({
-    before: `Doing ${task.toLowerCase()} by hand`,
-    after: "Automated — you spend that time on higher-judgment work",
-  }));
-  return [...pairs, ...automated];
-}
-
-function derivePracticePrompts(chosenRole: string): string[] {
-  const role = chosenRole || "your target";
-  return [
-    `Act as an interviewer for a ${role} role. Ask me one question at a time and give feedback on my answer.`,
-    `Give me five behavioral interview questions for a ${role} role and score my answers out of 10.`,
-    `Here is my answer to "tell me about yourself." Make it 60 seconds, clearer and more specific.`,
-  ];
-}
-
-function deriveResumeHighlight(tools: CoreReportOutput["tools"]): string[] {
-  return tools.slice(0, 5).map((t) => t.name);
-}
-
-function assembleReport(
-  core: CoreReportOutput,
-  resumeFeedback: ResumeFeedbackOutput,
-  rolesAndPlan: RolesAndPlanOutput,
-  interest: InterestData,
-): { report: Report; counselling: Counselling } {
-  const gapsAnalysis = GAP_CATEGORIES.map(({ key, label }) => {
-    const g = core.gapsAnalysis.find((entry) => entry.key === key)!;
-    return { category: label, level: g.level, score: g.score, nextStep: g.nextStep };
-  });
-
-  const scores = SCORE_LABELS.map(({ key, label }) => {
-    const s = core.scores.find((entry) => entry.key === key)!;
-    return { label, value: s.value, note: s.note };
-  });
-
-  const report: Report = {
-    startingPoint: core.startingPoint,
-    strengths: core.strengths,
-    gaps: core.gaps,
-    currentRole: core.currentRole,
-    futureRole: core.futureRole,
-    evolutionExplanation: core.evolutionExplanation,
-    automate: core.automate,
-    assist: core.assist,
-    human: core.human,
-    gapsAnalysis,
-    skillGroups: core.skillGroups,
-    tools: core.tools,
-    path: core.path,
-    scores,
-    aiReadiness: scores.find((s) => s.label === "AI Readiness")!.value,
-    resumeBullets: resumeFeedback.bulletsNow,
-  };
-
-  const readiness: ReadinessItem[] = READINESS_LABELS.map(({ key, label }) => {
-    const r = resumeFeedback.readiness.find((entry) => entry.key === key)!;
-    return { label, score: r.score, status: statusFor(r.score), recommendation: r.recommendation };
-  });
-  const readinessAverage = Math.round(
-    readiness.reduce((n, r) => n + r.score, 0) / readiness.length,
-  );
-
-  const matrix = MATRIX_SECTIONS.map(({ key, title, note }) => {
-    const m = rolesAndPlan.matrixItems.find((entry) => entry.key === key)!;
-    return { title, note, items: m.items };
-  });
-
-  const toolGroups = [
-    STATIC_TOOL_GROUPS.mustLearnFirst,
-    {
-      title: `Useful for ${interest.chosenRole || report.futureRole}`,
-      note: "Directly relevant to the role you are targeting.",
-      tools: rolesAndPlan.roleTools,
-    },
-    STATIC_TOOL_GROUPS.exploreLater,
-  ];
-
-  const counselling: Counselling = {
-    readiness,
-    readinessAverage,
-    resumeAdd: resumeFeedback.resumeAdd,
-    resumeReduce: resumeFeedback.resumeReduce,
-    resumeMeasurable: resumeFeedback.resumeMeasurable,
-    resumeHighlight: deriveResumeHighlight(core.tools),
-    resumeHonesty: resumeFeedback.resumeHonesty,
-    rewrites: resumeFeedback.rewrites,
-    targetRoles: rolesAndPlan.targetRoles,
-    matrix,
-    projects: rolesAndPlan.projects,
-    intro: rolesAndPlan.intro,
-    interviewQuestions: rolesAndPlan.interviewQuestions,
-    answerStructure: ANSWER_STRUCTURE,
-    practicePrompts: derivePracticePrompts(interest.chosenRole),
-    keywords: rolesAndPlan.keywords,
-    safety: SAFETY_TIPS,
-    starterPrompts: rolesAndPlan.starterPrompts,
-    sevenDays: rolesAndPlan.sevenDays,
-    dailyWork: deriveDailyWork(core.automate, core.assist),
-    gapWhy: GAP_WHY,
-    toolGroups,
-    pathOutputs: PATH_OUTPUTS,
-    scoreExplainers: SCORE_EXPLAINERS,
-    bulletsNow: resumeFeedback.bulletsNow,
-    bulletsEarned: rolesAndPlan.projects.map((p) => p.bullet),
-  };
-
-  return { report, counselling };
-}
-
 function fallbackGenerate(data: z.infer<typeof reportInputSchema>) {
   const report = fallbackBuildReport(
     data.parsed as ParsedResume,
@@ -293,6 +157,13 @@ function fallbackGenerate(data: z.infer<typeof reportInputSchema>) {
   return { report, counselling };
 }
 
+// Generating the report used to be one server function awaiting all three
+// AI calls together, so the UI had nothing to show until every call had
+// finished — a single long, uninterrupted wait. Each stage below is now its
+// own server function, independently callable (and still fired in parallel
+// from the client), so the UI can reveal each stage's content - with its own
+// short "Continue" step - as soon as that stage's call resolves, instead of
+// making the candidate wait through one long spinner for all three.
 const REPORT_SYSTEM_PROMPT =
   "You are a career counsellor generating part of a personalized AI-career-evolution report. " +
   "Calibrate every section to this specific candidate's ACTUAL seniority and evidenced skills — " +
@@ -301,54 +172,91 @@ const REPORT_SYSTEM_PROMPT =
   "recommendation, project, and bullet point must plausibly connect to THIS candidate's real " +
   "background and chosen direction. Be concrete and specific, not vague.";
 
-export const generateCareerReport = createServerFn({ method: "POST" })
+function reportUserContent(data: z.infer<typeof reportInputSchema>) {
+  return JSON.stringify({
+    candidateBackground: data.parsed,
+    chosenDirection: data.interest,
+    careerStage: data.signup.careerStage,
+  });
+}
+
+export const generateCoreStage = createServerFn({ method: "POST" })
   .validator(reportInputSchema)
-  .handler(async ({ data }): Promise<{ report: Report; counselling: Counselling }> => {
+  .handler(async ({ data }): Promise<{ ok: true; core: CoreReportOutput } | { ok: false }> => {
     try {
       const client = getAnthropicClient();
-      const userContent = JSON.stringify({
-        candidateBackground: data.parsed,
-        chosenDirection: data.interest,
-        careerStage: data.signup.careerStage,
+      const response = await client.messages.parse({
+        model: CLAUDE_MODEL,
+        max_tokens: 16000,
+        thinking: { type: "adaptive" },
+        output_config: { format: zodOutputFormat(CoreReportSchema), effort: "high" },
+        system: REPORT_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: reportUserContent(data) }],
       });
+      const core = response.parsed_output;
+      if (!core) throw new Error("Model did not return parseable output");
+      return { ok: true, core };
+    } catch (error) {
+      console.error("generateCoreStage failed", error);
+      return { ok: false };
+    }
+  });
 
-      const [coreResponse, resumeFeedbackResponse, rolesAndPlanResponse] = await Promise.all([
-        client.messages.parse({
-          model: CLAUDE_MODEL,
-          max_tokens: 16000,
-          thinking: { type: "adaptive" },
-          output_config: { format: zodOutputFormat(CoreReportSchema), effort: "high" },
-          system: REPORT_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userContent }],
-        }),
-        client.messages.parse({
+export const generateResumeFeedbackStage = createServerFn({ method: "POST" })
+  .validator(reportInputSchema)
+  .handler(
+    async ({
+      data,
+    }): Promise<{ ok: true; resumeFeedback: ResumeFeedbackOutput } | { ok: false }> => {
+      try {
+        const client = getAnthropicClient();
+        const response = await client.messages.parse({
           model: CLAUDE_MODEL,
           max_tokens: 16000,
           thinking: { type: "adaptive" },
           output_config: { format: zodOutputFormat(ResumeFeedbackSchema), effort: "high" },
           system: REPORT_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userContent }],
-        }),
-        client.messages.parse({
+          messages: [{ role: "user", content: reportUserContent(data) }],
+        });
+        const resumeFeedback = response.parsed_output;
+        if (!resumeFeedback) throw new Error("Model did not return parseable output");
+        return { ok: true, resumeFeedback };
+      } catch (error) {
+        console.error("generateResumeFeedbackStage failed", error);
+        return { ok: false };
+      }
+    },
+  );
+
+export const generateRolesAndPlanStage = createServerFn({ method: "POST" })
+  .validator(reportInputSchema)
+  .handler(
+    async ({ data }): Promise<{ ok: true; rolesAndPlan: RolesAndPlanOutput } | { ok: false }> => {
+      try {
+        const client = getAnthropicClient();
+        const response = await client.messages.parse({
           model: CLAUDE_MODEL,
           max_tokens: 16000,
           thinking: { type: "adaptive" },
           output_config: { format: zodOutputFormat(RolesAndPlanSchema), effort: "high" },
           system: REPORT_SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userContent }],
-        }),
-      ]);
-
-      const core = coreResponse.parsed_output;
-      const resumeFeedback = resumeFeedbackResponse.parsed_output;
-      const rolesAndPlan = rolesAndPlanResponse.parsed_output;
-      if (!core || !resumeFeedback || !rolesAndPlan) {
-        throw new Error("Model did not return parseable output");
+          messages: [{ role: "user", content: reportUserContent(data) }],
+        });
+        const rolesAndPlan = response.parsed_output;
+        if (!rolesAndPlan) throw new Error("Model did not return parseable output");
+        return { ok: true, rolesAndPlan };
+      } catch (error) {
+        console.error("generateRolesAndPlanStage failed", error);
+        return { ok: false };
       }
+    },
+  );
 
-      return assembleReport(core, resumeFeedback, rolesAndPlan, data.interest);
-    } catch (error) {
-      console.error("generateCareerReport: falling back to deterministic engine", error);
-      return fallbackGenerate(data);
-    }
+// Used when any one stage's AI call fails - rather than show a jarring mix
+// of AI-quality and generic content, the whole report degrades together to
+// the deterministic engine, same as the original all-or-nothing behavior.
+export const generateFallbackReport = createServerFn({ method: "POST" })
+  .validator(reportInputSchema)
+  .handler(async ({ data }): Promise<{ report: Report; counselling: Counselling }> => {
+    return fallbackGenerate(data);
   });

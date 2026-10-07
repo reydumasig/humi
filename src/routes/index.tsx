@@ -13,7 +13,8 @@ import { ResumeSummary } from "@/components/humi/ResumeSummary";
 import { CareerInterestForm } from "@/components/humi/CareerInterestForm";
 import { CareerEvolutionReport } from "@/components/humi/CareerEvolutionReport";
 import { GeneratingStages } from "@/components/humi/GeneratingStages";
-import { submitLead } from "@/lib/api/leads.functions";
+import { CandidateAuth } from "@/components/humi/CandidateAuth";
+import { submitLead, getMyReport } from "@/lib/api/leads.functions";
 import {
   analyzeResume,
   generateCoreStage,
@@ -57,7 +58,15 @@ export const Route = createFileRoute("/")({
 });
 
 type Step =
-  "welcome" | "signup" | "upload" | "parsing" | "summary" | "interest" | "generating" | "report";
+  | "welcome"
+  | "login"
+  | "signup"
+  | "upload"
+  | "parsing"
+  | "summary"
+  | "interest"
+  | "generating"
+  | "report";
 
 function HumiApp() {
   const [step, setStep] = useState<Step>("welcome");
@@ -194,6 +203,25 @@ function HumiApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genFailed]);
 
+  const handleReturningLogin = async (loggedInEmail: string) => {
+    try {
+      const mine = await getMyReport();
+      if (mine) {
+        setSignup(mine.signup);
+        setParsed(mine.parsed);
+        setReport(mine.report);
+        setCounselling(mine.counselling);
+        setStep("report");
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to load saved report", err);
+    }
+    setSignupPrefill({ email: loggedInEmail });
+    toast.message("You're logged in — let's build your career report.");
+    setStep("signup");
+  };
+
   const continueGenerating = () => {
     if (genStageIndex < 2) {
       setGenStageIndex((i) => (i + 1) as 0 | 1 | 2);
@@ -231,7 +259,16 @@ function HumiApp() {
       </header>
 
       <AnimatePresence mode="wait">
-        {step === "welcome" && <HumiWelcomeHero key="welcome" onStart={() => setStep("signup")} />}
+        {step === "welcome" && (
+          <HumiWelcomeHero
+            key="welcome"
+            onStart={() => setStep("signup")}
+            onLogin={() => setStep("login")}
+          />
+        )}
+        {step === "login" && (
+          <CandidateAuth key="login" defaultMode="login" onAuthenticated={handleReturningLogin} />
+        )}
         {step === "signup" && (
           <SignupForm
             key="signup"

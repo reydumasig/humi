@@ -20,12 +20,22 @@ const BENEFITS = [
   },
 ];
 
-export function HumiWelcomeHero({ onStart }: { onStart: () => void }) {
+export function HumiWelcomeHero({
+  onStart,
+  onLogin,
+}: {
+  onStart: () => void;
+  onLogin: () => void;
+}) {
   return (
     <section className="relative px-5 pb-16 pt-10 sm:pt-16">
       <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="brand-badge">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="brand-badge"
+          >
             AI Career Evolution
           </motion.div>
           <motion.h1
@@ -64,6 +74,12 @@ export function HumiWelcomeHero({ onStart }: { onStart: () => void }) {
               Built for job fair candidates, students, professionals, and career switchers who want
               to understand what skills will matter next.
             </p>
+            <button
+              onClick={onLogin}
+              className="text-sm font-semibold text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+            >
+              Already have a report? Log in to view it
+            </button>
           </motion.div>
         </div>
 

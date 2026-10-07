@@ -8,10 +8,11 @@ const field =
 
 interface Props {
   onAuthenticated: (email: string) => void;
+  defaultMode?: "signup" | "login";
 }
 
-export function CandidateAuth({ onAuthenticated }: Props) {
-  const [mode, setMode] = useState<"signup" | "login">("signup");
+export function CandidateAuth({ onAuthenticated, defaultMode = "signup" }: Props) {
+  const [mode, setMode] = useState<"signup" | "login">(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

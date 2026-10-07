@@ -217,7 +217,7 @@ export function ResumeUpload({ initial, onSubmit }: Props) {
         </button>
 
         <p className="mt-4 text-xs text-muted-foreground">
-          Your resume is analyzed only to generate your career profile for this demo experience.
+          Your resume is analyzed only to generate your career profile.
         </p>
       </div>
     </motion.section>

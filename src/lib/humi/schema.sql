@@ -2,6 +2,7 @@
 
 create table if not exists public.candidates (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
   first_name text not null,
   last_name text not null,
   email text not null,
@@ -12,8 +13,18 @@ create table if not exists public.candidates (
   recommended_role text,
   career_interest text,
   ai_readiness integer,
+  report_json jsonb,
+  counselling_json jsonb,
+  parsed_json jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Added after the table already existed in production — safe to re-run.
+alter table public.candidates add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.candidates add column if not exists report_json jsonb;
+alter table public.candidates add column if not exists counselling_json jsonb;
+alter table public.candidates add column if not exists parsed_json jsonb;
+create index if not exists candidates_user_id_idx on public.candidates(user_id);
 
 -- RLS is enabled with no policies: the table is only ever reached through
 -- the server-side service_role key (see src/lib/humi/supabase.server.ts),
@@ -49,6 +60,7 @@ alter table public.job_postings enable row level security;
 
 create table if not exists public.job_applications (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
   job_id text not null references public.job_postings(id) on delete cascade,
   job_title text not null,
   company text not null,
@@ -62,4 +74,23 @@ create table if not exists public.job_applications (
   created_at timestamptz not null default now()
 );
 
+alter table public.job_applications add column if not exists user_id uuid references auth.users(id) on delete cascade;
+create index if not exists job_applications_user_id_idx on public.job_applications(user_id);
+
 alter table public.job_applications enable row level security;
+
+-- "Click for help" requests — a candidate reading their report can ask for
+-- hands-on help (resume rewrite, AI tool training, etc.) from any section;
+-- topic records which section they clicked it from.
+create table if not exists public.help_requests (
+  id uuid primary key default gen_random_uuid(),
+  first_name text not null,
+  last_name text not null,
+  email text not null,
+  phone text,
+  topic text not null,
+  message text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.help_requests enable row level security;

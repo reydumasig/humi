@@ -13,7 +13,6 @@ import { ResumeSummary } from "@/components/humi/ResumeSummary";
 import { CareerInterestForm } from "@/components/humi/CareerInterestForm";
 import { CareerEvolutionReport } from "@/components/humi/CareerEvolutionReport";
 import { GeneratingStages } from "@/components/humi/GeneratingStages";
-import { SAMPLE_PROFILES } from "@/lib/humi/engine";
 import { submitLead } from "@/lib/api/leads.functions";
 import {
   analyzeResume,
@@ -143,6 +142,9 @@ function HumiApp() {
     form.set("recommendedRole", built.futureRole);
     form.set("careerInterest", `${interestData.chosenRole} · ${interestData.industry}`);
     form.set("aiReadiness", String(built.aiReadiness));
+    form.set("reportJson", JSON.stringify(built));
+    form.set("counsellingJson", JSON.stringify(builtCounselling));
+    form.set("parsedJson", JSON.stringify(parsed));
     if (resumeFile) form.set("resume", resumeFile);
 
     submitLead({ data: form }).catch((err) => {
@@ -207,24 +209,6 @@ function HumiApp() {
     finalizeReport(built, builtCounselling, pendingInterest);
   };
 
-  const loadSample = (index: number) => {
-    const s = SAMPLE_PROFILES[index]!;
-    const who: SignupData = {
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      location: "",
-      careerStage: "",
-      consent: true,
-      ...s.signup,
-    } as SignupData;
-    setSignup(who);
-    setSignupPrefill(s.signup);
-    setResumePrefill(s.resume);
-    void runParse(s.resume, who);
-  };
-
   return (
     <main className="relative min-h-screen overflow-hidden">
       <OrbitBackdrop />
@@ -236,26 +220,11 @@ function HumiApp() {
             <HumiLogo />
           </button>
           <div className="flex items-center gap-3">
-            {step === "welcome" && (
-              <select
-                onChange={(e) => e.target.value !== "" && loadSample(Number(e.target.value))}
-                defaultValue=""
-                className="hidden rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold sm:block"
-                aria-label="Load a demo profile"
-              >
-                <option value="">Demo profile…</option>
-                {SAMPLE_PROFILES.map((s, i) => (
-                  <option key={s.label} value={i}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            )}
             <Link
               to="/admin"
               className="text-xs font-semibold text-muted-foreground hover:text-primary"
             >
-              Admin
+              Login
             </Link>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getSupabaseAdmin } from "../humi/supabase.server";
 import { requireAdminSession } from "../humi/session.server";
+import { getCandidateSession } from "../humi/candidate-session.server";
 import type { JobApplication } from "../humi/types";
 
 function rowToApplication(row: Record<string, unknown>): JobApplication {
@@ -39,10 +40,12 @@ export const submitApplication = createServerFn({ method: "POST" })
   .validator((data: unknown) => applicationInputSchema.parse(data))
   .handler(async ({ data }): Promise<JobApplication> => {
     const supabase = getSupabaseAdmin();
+    const session = await getCandidateSession();
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const { error } = await supabase.from("job_applications").insert({
       id,
+      user_id: session.data.userId ?? null,
       job_id: data.jobId,
       job_title: data.jobTitle,
       company: data.company,
@@ -71,6 +74,24 @@ export const submitApplication = createServerFn({ method: "POST" })
       createdAt,
     };
   });
+
+// Scoped to the logged-in candidate's own applications (used by the jobs
+// pages to show "Applied" on a job card) - distinct from getApplications
+// below, which is the admin-only view across every candidate.
+export const getMyApplications = createServerFn({ method: "GET" }).handler(
+  async (): Promise<JobApplication[]> => {
+    const session = await getCandidateSession();
+    if (!session.data.userId) return [];
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("job_applications")
+      .select("*")
+      .eq("user_id", session.data.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(rowToApplication);
+  },
+);
 
 export const getApplications = createServerFn({ method: "GET" }).handler(
   async (): Promise<JobApplication[]> => {

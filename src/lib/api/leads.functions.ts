@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { getSupabaseAdmin } from "../humi/supabase.server";
 import { requireAdminSession } from "../humi/session.server";
+import { getCandidateSession } from "../humi/candidate-session.server";
+import type { Counselling } from "../humi/counselling";
+import type { ParsedResume, Report, SignupData } from "../humi/types";
 
 const RESUME_BUCKET = "resumes";
 
@@ -14,6 +17,7 @@ export const submitLead = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const supabase = getSupabaseAdmin();
+    const session = await getCandidateSession();
 
     const firstName = String(data.get("firstName") ?? "");
     const lastName = String(data.get("lastName") ?? "");
@@ -23,6 +27,9 @@ export const submitLead = createServerFn({ method: "POST" })
     const recommendedRole = String(data.get("recommendedRole") ?? "");
     const careerInterest = String(data.get("careerInterest") ?? "");
     const aiReadiness = Number(data.get("aiReadiness") ?? 0);
+    const reportJson = data.get("reportJson");
+    const counsellingJson = data.get("counsellingJson");
+    const parsedJson = data.get("parsedJson");
     const file = data.get("resume");
 
     let resumePath: string | null = null;
@@ -41,6 +48,7 @@ export const submitLead = createServerFn({ method: "POST" })
     }
 
     const { error } = await supabase.from("candidates").insert({
+      user_id: session.data.userId ?? null,
       first_name: firstName,
       last_name: lastName,
       email,
@@ -51,6 +59,9 @@ export const submitLead = createServerFn({ method: "POST" })
       recommended_role: recommendedRole,
       career_interest: careerInterest,
       ai_readiness: aiReadiness,
+      report_json: typeof reportJson === "string" ? JSON.parse(reportJson) : null,
+      counselling_json: typeof counsellingJson === "string" ? JSON.parse(counsellingJson) : null,
+      parsed_json: typeof parsedJson === "string" ? JSON.parse(parsedJson) : null,
     });
     if (error) {
       throw new Error(`Failed to save candidate: ${error.message}`);
@@ -58,6 +69,46 @@ export const submitLead = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
+// Lets a returning, already-authenticated candidate land back on their most
+// recent report instead of re-uploading and re-generating from scratch.
+export const getMyReport = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{
+    signup: SignupData;
+    parsed: ParsedResume;
+    report: Report;
+    counselling: Counselling;
+  } | null> => {
+    const session = await getCandidateSession();
+    if (!session.data.userId) return null;
+
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("*")
+      .eq("user_id", session.data.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data?.report_json || !data.counselling_json || !data.parsed_json) return null;
+
+    return {
+      signup: {
+        firstName: data.first_name as string,
+        lastName: data.last_name as string,
+        email: data.email as string,
+        phone: (data.phone as string) ?? "",
+        location: "",
+        careerStage: (data.career_stage as SignupData["careerStage"]) ?? "",
+        consent: true,
+      },
+      parsed: data.parsed_json as ParsedResume,
+      report: data.report_json as Report,
+      counselling: data.counselling_json as Counselling,
+    };
+  },
+);
 
 export const getLeads = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdminSession();

@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CandidateLeadsDashboard } from "./CandidateLeadsDashboard";
 import { JobPostingsAdmin } from "./JobPostingsAdmin";
 import { ApplicationsAdmin } from "./ApplicationsAdmin";
+import { HelpRequestsAdmin } from "./HelpRequestsAdmin";
 
 export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
   return (
@@ -10,6 +11,7 @@ export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
         <TabsTrigger value="leads">Leads</TabsTrigger>
         <TabsTrigger value="jobs">Job postings</TabsTrigger>
         <TabsTrigger value="applications">Applications</TabsTrigger>
+        <TabsTrigger value="help">Help requests</TabsTrigger>
       </TabsList>
       <TabsContent value="leads" className="mt-6">
         <CandidateLeadsDashboard adminEmail={adminEmail} />
@@ -19,6 +21,9 @@ export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
       </TabsContent>
       <TabsContent value="applications" className="mt-6">
         <ApplicationsAdmin />
+      </TabsContent>
+      <TabsContent value="help" className="mt-6">
+        <HelpRequestsAdmin />
       </TabsContent>
     </Tabs>
   );

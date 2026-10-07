@@ -43,7 +43,14 @@ export function SignupForm({ initial, onSubmit }: Props) {
     if (!/^\S+@\S+\.\S+$/.test(data.email.trim())) next.email = "A valid email is required";
     if (!data.consent) next.consent = "Please give consent to continue";
     setErrors(next);
-    if (Object.keys(next).length === 0) onSubmit({ ...data, firstName: data.firstName.trim(), lastName: data.lastName.trim(), email: data.email.trim() });
+    if (Object.keys(next).length === 0) {
+      onSubmit({
+        ...data,
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email: data.email.trim(),
+      });
+    }
   };
 
   return (
@@ -62,39 +69,80 @@ export function SignupForm({ initial, onSubmit }: Props) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-semibold">First Name *</label>
-              <input className={field} value={data.firstName} onChange={(e) => set("firstName", e.target.value)} maxLength={60} placeholder="Maya" />
-              {errors.firstName && <p className="mt-1 text-xs text-destructive">{errors.firstName}</p>}
+              <input
+                className={field}
+                value={data.firstName}
+                onChange={(e) => set("firstName", e.target.value)}
+                maxLength={60}
+                placeholder="Maya"
+              />
+              {errors.firstName && (
+                <p className="mt-1 text-xs text-destructive">{errors.firstName}</p>
+              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Last Name *</label>
-              <input className={field} value={data.lastName} onChange={(e) => set("lastName", e.target.value)} maxLength={60} placeholder="Santos" />
-              {errors.lastName && <p className="mt-1 text-xs text-destructive">{errors.lastName}</p>}
+              <input
+                className={field}
+                value={data.lastName}
+                onChange={(e) => set("lastName", e.target.value)}
+                maxLength={60}
+                placeholder="Santos"
+              />
+              {errors.lastName && (
+                <p className="mt-1 text-xs text-destructive">{errors.lastName}</p>
+              )}
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Email Address *</label>
-              <input className={field} type="email" value={data.email} onChange={(e) => set("email", e.target.value)} maxLength={120} placeholder="you@example.com" />
+              <input
+                className={field}
+                type="email"
+                value={data.email}
+                onChange={(e) => set("email", e.target.value)}
+                maxLength={120}
+                placeholder="you@example.com"
+              />
               {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email}</p>}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Phone Number</label>
-              <input className={field} value={data.phone} onChange={(e) => set("phone", e.target.value)} maxLength={30} placeholder="+63 900 000 0000" />
+              <input
+                className={field}
+                value={data.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                maxLength={30}
+                placeholder="+63 900 000 0000"
+              />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Current Location</label>
-              <input className={field} value={data.location} onChange={(e) => set("location", e.target.value)} maxLength={80} placeholder="City" />
+              <input
+                className={field}
+                value={data.location}
+                onChange={(e) => set("location", e.target.value)}
+                maxLength={80}
+                placeholder="City"
+              />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-semibold">Career Stage</label>
-              <select className={field} value={data.careerStage} onChange={(e) => set("careerStage", e.target.value as CareerStage)}>
+              <select
+                className={field}
+                value={data.careerStage}
+                onChange={(e) => set("careerStage", e.target.value as CareerStage)}
+              >
                 <option value="">Select your stage</option>
                 {STAGES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
             </div>
@@ -116,8 +164,8 @@ export function SignupForm({ initial, onSubmit }: Props) {
 
           <p className="flex items-start gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            Your resume and details are used only to generate your career profile for this demo
-            experience. Humi.ai provides career guidance, not hiring decisions.
+            Your resume and details are used only to generate your career profile. Humi.ai provides
+            career guidance, not hiring decisions.
           </p>
 
           <button

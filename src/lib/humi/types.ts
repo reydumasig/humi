@@ -145,6 +145,16 @@ export interface JobPosting {
   createdAt: string;
 }
 
+export type ApplicationStatus = "Applied" | "Screening" | "Interview" | "Offer" | "Rejected";
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  "Applied",
+  "Screening",
+  "Interview",
+  "Offer",
+  "Rejected",
+];
+
 export interface JobApplication {
   id: string;
   jobId: string;
@@ -157,13 +167,15 @@ export interface JobApplication {
   interviewDate: string;
   interviewTime: string;
   interviewMode: string;
+  status: ApplicationStatus;
   createdAt: string;
 }
 
 // Persisted client-side only (localStorage) so the standalone /jobs pages can
 // prefill and match against the candidate who just left the report flow —
-// there is no candidate login, so this device-local snapshot is the only
-// link between a report and a later jobs-page visit.
+// candidate login exists, but these pages still work for guests, so this
+// device-local snapshot stays the fallback link between a report and a
+// later jobs-page visit.
 export interface CandidateProfile {
   firstName: string;
   lastName: string;

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getSupabaseAdmin } from "../humi/supabase.server";
 import { requireAdminSession } from "../humi/session.server";
 import { getCandidateSession } from "../humi/candidate-session.server";
-import type { JobApplication } from "../humi/types";
+import { APPLICATION_STATUSES, type JobApplication } from "../humi/types";
 
 function rowToApplication(row: Record<string, unknown>): JobApplication {
   return {
@@ -19,6 +19,7 @@ function rowToApplication(row: Record<string, unknown>): JobApplication {
     interviewDate: row.interview_date as string,
     interviewTime: row.interview_time as string,
     interviewMode: row.interview_mode as string,
+    status: (row.status as JobApplication["status"]) ?? "Applied",
     createdAt: row.created_at as string,
   };
 }
@@ -56,6 +57,7 @@ export const submitApplication = createServerFn({ method: "POST" })
       interview_date: data.interviewDate,
       interview_time: data.interviewTime,
       interview_mode: data.interviewMode,
+      status: "Applied",
       created_at: createdAt,
     });
     if (error) throw new Error(`Failed to submit application: ${error.message}`);
@@ -71,8 +73,27 @@ export const submitApplication = createServerFn({ method: "POST" })
       interviewDate: data.interviewDate,
       interviewTime: data.interviewTime,
       interviewMode: data.interviewMode,
+      status: "Applied",
       createdAt,
     };
+  });
+
+const updateStatusInputSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(APPLICATION_STATUSES as [string, ...string[]]),
+});
+
+export const updateApplicationStatus = createServerFn({ method: "POST" })
+  .validator((data: unknown) => updateStatusInputSchema.parse(data))
+  .handler(async ({ data }) => {
+    await requireAdminSession();
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("job_applications")
+      .update({ status: data.status })
+      .eq("id", data.id);
+    if (error) throw new Error(`Failed to update application status: ${error.message}`);
+    return { ok: true as const };
   });
 
 // Scoped to the logged-in candidate's own applications (used by the jobs

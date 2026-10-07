@@ -3,8 +3,15 @@ import { CandidateLeadsDashboard } from "./CandidateLeadsDashboard";
 import { JobPostingsAdmin } from "./JobPostingsAdmin";
 import { ApplicationsAdmin } from "./ApplicationsAdmin";
 import { HelpRequestsAdmin } from "./HelpRequestsAdmin";
+import { TeamAdmin } from "./TeamAdmin";
 
-export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
+export function AdminDashboard({
+  adminEmail,
+  adminRole,
+}: {
+  adminEmail?: string;
+  adminRole?: "owner" | "admin";
+}) {
   return (
     <Tabs defaultValue="leads" className="mt-6">
       <TabsList>
@@ -12,6 +19,7 @@ export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
         <TabsTrigger value="jobs">Job postings</TabsTrigger>
         <TabsTrigger value="applications">Applications</TabsTrigger>
         <TabsTrigger value="help">Help requests</TabsTrigger>
+        {adminRole === "owner" && <TabsTrigger value="team">Team</TabsTrigger>}
       </TabsList>
       <TabsContent value="leads" className="mt-6">
         <CandidateLeadsDashboard adminEmail={adminEmail} />
@@ -25,6 +33,11 @@ export function AdminDashboard({ adminEmail }: { adminEmail?: string }) {
       <TabsContent value="help" className="mt-6">
         <HelpRequestsAdmin />
       </TabsContent>
+      {adminRole === "owner" && (
+        <TabsContent value="team" className="mt-6">
+          <TeamAdmin currentAdminEmail={adminEmail} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

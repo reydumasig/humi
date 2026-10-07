@@ -7,7 +7,7 @@ export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
     const me = await getAdminMe();
     if (!me) throw redirect({ to: "/admin-login" });
-    return { adminEmail: me.email };
+    return { adminEmail: me.email, adminRole: me.role };
   },
   head: () => ({
     meta: [
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminRoute() {
-  const { adminEmail } = Route.useRouteContext();
+  const { adminEmail, adminRole } = Route.useRouteContext();
   const navigate = useNavigate();
 
   const logout = async () => {
@@ -53,7 +53,7 @@ function AdminRoute() {
         </button>
       </div>
 
-      <AdminDashboard adminEmail={adminEmail} />
+      <AdminDashboard adminEmail={adminEmail} adminRole={adminRole} />
     </main>
   );
 }

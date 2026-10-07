@@ -72,6 +72,37 @@ const jobInputSchema = z.object({
   interviewMode: z.enum(["Video call", "Onsite", "Phone call"]),
 });
 
+const updateJobDetailsSchema = jobInputSchema.extend({ id: z.string().min(1) });
+
+export const updateJobPostingDetails = createServerFn({ method: "POST" })
+  .validator((data: unknown) => updateJobDetailsSchema.parse(data))
+  .handler(async ({ data }) => {
+    await requireAdminSession();
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("job_postings")
+      .update({
+        title: data.title,
+        company: data.company,
+        company_blurb: data.companyBlurb,
+        location: data.location,
+        work_type: data.workType,
+        salary: data.salary,
+        description: data.description,
+        responsibilities: data.responsibilities,
+        requirements: data.requirements,
+        ai_tools: data.aiTools,
+        skills: data.skills,
+        families: data.families,
+        interview_dates: data.interviewDates,
+        interview_slots: data.interviewSlots,
+        interview_mode: data.interviewMode,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(`Failed to update job posting: ${error.message}`);
+    return { ok: true as const };
+  });
+
 export const createJobPosting = createServerFn({ method: "POST" })
   .validator((data: unknown) => jobInputSchema.parse(data))
   .handler(async ({ data }) => {

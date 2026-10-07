@@ -71,10 +71,12 @@ create table if not exists public.job_applications (
   interview_date text not null,
   interview_time text not null,
   interview_mode text not null,
+  status text not null default 'Applied',
   created_at timestamptz not null default now()
 );
 
 alter table public.job_applications add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.job_applications add column if not exists status text not null default 'Applied';
 create index if not exists job_applications_user_id_idx on public.job_applications(user_id);
 
 alter table public.job_applications enable row level security;
@@ -94,3 +96,16 @@ create table if not exists public.help_requests (
 );
 
 alter table public.help_requests enable row level security;
+
+-- Admin access allowlist: logging in with valid Supabase Auth credentials is
+-- not enough to reach /admin (a candidate account is also a valid Auth user)
+-- — the account must also have a row here. "owner" can manage this table via
+-- the Team tab; "admin" cannot.
+create table if not exists public.admin_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text not null,
+  role text not null default 'admin',
+  created_at timestamptz not null default now()
+);
+
+alter table public.admin_users enable row level security;

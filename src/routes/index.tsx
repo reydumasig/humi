@@ -79,6 +79,7 @@ function HumiApp() {
   const [report, setReport] = useState<Report | null>(null);
   const [counselling, setCounselling] = useState<Counselling | null>(null);
   const [resumeFile, setResumeFile] = useState<File | undefined>();
+  const [leadId, setLeadId] = useState<string | null>(null);
   const [candidateEmail, setCandidateEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -170,10 +171,12 @@ function HumiApp() {
     form.set("parsedJson", JSON.stringify(parsed));
     if (resumeFile) form.set("resume", resumeFile);
 
-    submitLead({ data: form }).catch((err) => {
-      console.error("Failed to save candidate lead", err);
-      toast.error("We couldn't save your submission, but your report is ready below.");
-    });
+    submitLead({ data: form })
+      .then((res) => setLeadId(res.id))
+      .catch((err) => {
+        console.error("Failed to save candidate lead", err);
+        toast.error("We couldn't save your submission, but your report is ready below.");
+      });
 
     setStep("report");
   };
@@ -226,6 +229,7 @@ function HumiApp() {
         setParsed(mine.parsed);
         setReport(mine.report);
         setCounselling(mine.counselling);
+        setLeadId(mine.id);
         setStep("report");
         return;
       }
@@ -342,6 +346,7 @@ function HumiApp() {
             counselling={counselling}
             parsed={parsed}
             signup={signup}
+            leadId={leadId}
             onRestart={() => {
               setStep("welcome");
               setReport(null);
@@ -353,6 +358,7 @@ function HumiApp() {
               setSignupPrefill(undefined);
               setResumePrefill(undefined);
               setResumeFile(undefined);
+              setLeadId(null);
 
               setGenStageIndex(0);
               setPendingInterest(null);

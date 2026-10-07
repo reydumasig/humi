@@ -1,8 +1,11 @@
 import { useSession } from "@tanstack/react-start/server";
 
+export type AdminRole = "owner" | "admin";
+
 export interface AdminSessionData {
   userId: string;
   email: string;
+  role: AdminRole;
 }
 
 function sessionConfig() {
@@ -26,6 +29,14 @@ export async function requireAdminSession() {
   const session = await getAdminSession();
   if (!session.data.userId) {
     throw new Error("Not authenticated");
+  }
+  return session;
+}
+
+export async function requireOwnerSession() {
+  const session = await requireAdminSession();
+  if (session.data.role !== "owner") {
+    throw new Error("Only an owner can do this.");
   }
   return session;
 }

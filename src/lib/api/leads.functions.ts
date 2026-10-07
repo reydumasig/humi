@@ -31,6 +31,7 @@ export const submitLead = createServerFn({ method: "POST" })
     const counsellingJson = data.get("counsellingJson");
     const parsedJson = data.get("parsedJson");
     const file = data.get("resume");
+    const leadId = String(data.get("leadId") ?? "").trim() || null;
 
     let resumePath: string | null = null;
     let resumeFileName: string | null = null;
@@ -47,33 +48,60 @@ export const submitLead = createServerFn({ method: "POST" })
       }
     }
 
-    const { error } = await supabase.from("candidates").insert({
+    const payload: Record<string, unknown> = {
       user_id: session.data.userId ?? null,
       first_name: firstName,
       last_name: lastName,
       email,
       phone,
       career_stage: careerStage,
-      resume_path: resumePath,
-      resume_file_name: resumeFileName,
       recommended_role: recommendedRole,
       career_interest: careerInterest,
       ai_readiness: aiReadiness,
       report_json: typeof reportJson === "string" ? JSON.parse(reportJson) : null,
       counselling_json: typeof counsellingJson === "string" ? JSON.parse(counsellingJson) : null,
       parsed_json: typeof parsedJson === "string" ? JSON.parse(parsedJson) : null,
-    });
+    };
+    // Only touch the resume columns when this call actually carries a file,
+    // so a later update (e.g. linking the account after PDF-gate signup)
+    // doesn't null out the resume captured by the original submission.
+    if (resumePath) {
+      payload.resume_path = resumePath;
+      payload.resume_file_name = resumeFileName;
+    }
+
+    // A leadId means this is the same report being re-submitted (most often
+    // to attach the account just created at PDF-download time) — update that
+    // row in place instead of inserting a duplicate candidate record.
+    if (leadId) {
+      const { data: updated, error: updateError } = await supabase
+        .from("candidates")
+        .update(payload)
+        .eq("id", leadId)
+        .select("id")
+        .maybeSingle();
+      if (updateError) {
+        throw new Error(`Failed to save candidate: ${updateError.message}`);
+      }
+      if (updated) {
+        return { ok: true as const, id: updated.id as string };
+      }
+    }
+
+    const id = crypto.randomUUID();
+    const { error } = await supabase.from("candidates").insert({ id, ...payload });
     if (error) {
       throw new Error(`Failed to save candidate: ${error.message}`);
     }
 
-    return { ok: true as const };
+    return { ok: true as const, id };
   });
 
 // Lets a returning, already-authenticated candidate land back on their most
 // recent report instead of re-uploading and re-generating from scratch.
 export const getMyReport = createServerFn({ method: "GET" }).handler(
   async (): Promise<{
+    id: string;
     signup: SignupData;
     parsed: ParsedResume;
     report: Report;
@@ -94,6 +122,7 @@ export const getMyReport = createServerFn({ method: "GET" }).handler(
     if (!data?.report_json || !data.counselling_json || !data.parsed_json) return null;
 
     return {
+      id: data.id as string,
       signup: {
         firstName: data.first_name as string,
         lastName: data.last_name as string,

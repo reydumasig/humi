@@ -16,8 +16,28 @@ export const adminLogin = createServerFn({ method: "POST" })
       throw new Error("Invalid email or password.");
     }
 
+    // Being a valid Supabase Auth user (which a candidate account also is)
+    // is not enough — only accounts explicitly allow-listed in admin_users
+    // may hold an admin session. This check needs its own fresh client:
+    // signInWithPassword above mutated `supabase`'s session, so a `.from()`
+    // call on that same client would run as the just-authenticated user
+    // (not the service role), and RLS — enabled with no policies — would
+    // silently return zero rows regardless of what's actually in the table.
+    const { data: adminRow } = await getSupabaseAdmin()
+      .from("admin_users")
+      .select("role")
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (!adminRow) {
+      throw new Error("This account doesn't have admin access.");
+    }
+
     const session = await getAdminSession();
-    await session.update({ userId: auth.user.id, email: auth.user.email ?? data.email });
+    await session.update({
+      userId: auth.user.id,
+      email: auth.user.email ?? data.email,
+      role: adminRow.role as "owner" | "admin",
+    });
     return { ok: true as const };
   });
 
@@ -29,5 +49,5 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
 
 export const getAdminMe = createServerFn({ method: "GET" }).handler(async () => {
   const session = await getAdminSession();
-  return session.data.userId ? { email: session.data.email } : null;
+  return session.data.userId ? { email: session.data.email, role: session.data.role } : null;
 });

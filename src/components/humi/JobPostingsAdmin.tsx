@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   createJobPosting,
   deleteJobPosting,
   getAllJobPostings,
   updateJobPosting,
+  updateJobPostingDetails,
 } from "@/lib/api/jobs.functions";
 import { getApplications } from "@/lib/api/applications.functions";
 import type { FamilyKey, JobPosting, WorkType } from "@/lib/humi/types";
@@ -60,6 +61,7 @@ export function JobPostingsAdmin() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const { data: jobs = [], isLoading } = useQuery({
@@ -87,6 +89,18 @@ export function JobPostingsAdmin() {
     onError: () => setError("Failed to publish the job posting. Please try again."),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: updateJobPostingDetails,
+    onSuccess: () => {
+      invalidate();
+      setForm(EMPTY);
+      setEditingId(null);
+      setShowForm(false);
+      setError("");
+    },
+    onError: () => setError("Failed to save changes. Please try again."),
+  });
+
   const toggleMutation = useMutation({
     mutationFn: updateJobPosting,
     onSuccess: invalidate,
@@ -100,38 +114,70 @@ export function JobPostingsAdmin() {
   const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  const startEdit = (j: JobPosting) => {
+    setEditingId(j.id);
+    setForm({
+      title: j.title,
+      company: j.company,
+      companyBlurb: j.companyBlurb,
+      location: j.location,
+      workType: j.workType,
+      salary: j.salary,
+      description: j.description,
+      responsibilities: j.responsibilities.join("\n"),
+      requirements: j.requirements.join("\n"),
+      aiTools: j.aiTools,
+      skills: j.skills.join(", "),
+      families: j.families,
+      interviewDates: j.interviewDates.join(", "),
+      interviewSlots: j.interviewSlots.join(", "),
+      interviewMode: j.interviewMode,
+    });
+    setError("");
+    setShowForm(true);
+  };
+
+  const cancelForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(EMPTY);
+    setError("");
+  };
+
   const submit = () => {
     if (!form.title.trim() || !form.company.trim() || !form.description.trim()) {
       setError("Title, company and description are required.");
       return;
     }
-    createMutation.mutate({
-      data: {
-        title: form.title.trim(),
-        company: form.company.trim(),
-        companyBlurb:
-          form.companyBlurb.trim() || `${form.company.trim()} is hiring at the job fair.`,
-        location: form.location.trim() || "Not specified",
-        workType: form.workType,
-        salary: form.salary.trim() || "Salary discussed at interview",
-        description: form.description.trim(),
-        responsibilities: split(form.responsibilities),
-        requirements: split(form.requirements),
-        aiTools: form.aiTools.trim() || "AI tools introduced during onboarding.",
-        skills: split(form.skills),
-        families: form.families.length ? form.families : ["general"],
-        interviewDates: split(form.interviewDates),
-        interviewSlots: split(form.interviewSlots),
-        interviewMode: form.interviewMode,
-      },
-    });
+    const payload = {
+      title: form.title.trim(),
+      company: form.company.trim(),
+      companyBlurb: form.companyBlurb.trim() || `${form.company.trim()} is hiring at the job fair.`,
+      location: form.location.trim() || "Not specified",
+      workType: form.workType,
+      salary: form.salary.trim() || "Salary discussed at interview",
+      description: form.description.trim(),
+      responsibilities: split(form.responsibilities),
+      requirements: split(form.requirements),
+      aiTools: form.aiTools.trim() || "AI tools introduced during onboarding.",
+      skills: split(form.skills),
+      families: form.families.length ? form.families : ["general"],
+      interviewDates: split(form.interviewDates),
+      interviewSlots: split(form.interviewSlots),
+      interviewMode: form.interviewMode,
+    };
+    if (editingId) {
+      updateMutation.mutate({ data: { id: editingId, ...payload } });
+    } else {
+      createMutation.mutate({ data: payload });
+    }
   };
 
   return (
     <div>
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => (showForm ? cancelForm() : setShowForm(true))}
           className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground"
         >
           <Plus className="h-4 w-4" /> {showForm ? "Close form" : "New job posting"}
@@ -140,6 +186,9 @@ export function JobPostingsAdmin() {
 
       {showForm && (
         <div className="surface-card mt-5 space-y-3 p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            {editingId ? "Editing job posting" : "New job posting"}
+          </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <input
               className={field}
@@ -259,13 +308,29 @@ export function JobPostingsAdmin() {
           </div>
 
           {error && <p className="text-xs font-bold text-primary">{error}</p>}
-          <button
-            onClick={submit}
-            disabled={createMutation.isPending}
-            className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
-          >
-            {createMutation.isPending ? "Publishing…" : "Publish job posting"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={submit}
+              disabled={createMutation.isPending || updateMutation.isPending}
+              className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground disabled:opacity-60"
+            >
+              {editingId
+                ? updateMutation.isPending
+                  ? "Saving…"
+                  : "Save changes"
+                : createMutation.isPending
+                  ? "Publishing…"
+                  : "Publish job posting"}
+            </button>
+            {editingId && (
+              <button
+                onClick={cancelForm}
+                className="rounded-full border border-border px-6 py-3 text-sm font-bold text-muted-foreground"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -299,13 +364,22 @@ export function JobPostingsAdmin() {
                   </button>
                 </td>
                 <td className="px-4 py-3">
-                  <button
-                    aria-label={`Delete ${j.title}`}
-                    onClick={() => deleteMutation.mutate({ data: { id: j.id } })}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      aria-label={`Edit ${j.title}`}
+                      onClick={() => startEdit(j)}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      aria-label={`Delete ${j.title}`}
+                      onClick={() => deleteMutation.mutate({ data: { id: j.id } })}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

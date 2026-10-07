@@ -102,6 +102,7 @@ interface Props {
   counselling: Counselling;
   parsed: ParsedResume;
   signup: SignupData;
+  leadId: string | null;
   onRestart: () => void;
 }
 
@@ -110,6 +111,7 @@ export function CareerEvolutionReport({
   counselling: c,
   parsed,
   signup,
+  leadId,
   onRestart,
 }: Props) {
   const topSkills = c.matrix[0]!.items;
@@ -220,6 +222,7 @@ export function CareerEvolutionReport({
     form.set("reportJson", JSON.stringify(report));
     form.set("counsellingJson", JSON.stringify(c));
     form.set("parsedJson", JSON.stringify(parsed));
+    if (leadId) form.set("leadId", leadId);
     await submitLead({ data: form }).catch((err) => {
       console.error("Failed to link report to account", err);
     });

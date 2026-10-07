@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { getSupabaseAdmin } from "../humi/supabase.server";
-import { getAdminSession } from "../humi/session.server";
+import { getAdminSession, requireAdminSession } from "../humi/session.server";
 
 export const adminLogin = createServerFn({ method: "POST" })
   .validator(z.object({ email: z.string().email(), password: z.string().min(1) }))
@@ -48,6 +48,10 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
 });
 
 export const getAdminMe = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await getAdminSession();
-  return session.data.userId ? { email: session.data.email, role: session.data.role } : null;
+  try {
+    const session = await requireAdminSession();
+    return { email: session.data.email, role: session.data.role };
+  } catch {
+    return null;
+  }
 });

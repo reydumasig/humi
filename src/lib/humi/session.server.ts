@@ -1,4 +1,5 @@
 import { useSession } from "@tanstack/react-start/server";
+import { getSupabaseAdmin } from "./supabase.server";
 
 export type AdminRole = "owner" | "admin";
 
@@ -30,6 +31,24 @@ export async function requireAdminSession() {
   if (!session.data.userId) {
     throw new Error("Not authenticated");
   }
+
+  // The session alone isn't proof of current access: an owner can revoke an
+  // admin from the Team tab at any time, and that must take effect on this
+  // session's very next request, not just block future logins. Re-check the
+  // allowlist on every use rather than trusting what was true at login time.
+  const { data: adminRow } = await getSupabaseAdmin()
+    .from("admin_users")
+    .select("role")
+    .eq("user_id", session.data.userId)
+    .maybeSingle();
+  if (!adminRow) {
+    await session.clear();
+    throw new Error("Not authenticated");
+  }
+  if (adminRow.role !== session.data.role) {
+    await session.update({ ...session.data, role: adminRow.role as AdminRole });
+  }
+
   return session;
 }
 
